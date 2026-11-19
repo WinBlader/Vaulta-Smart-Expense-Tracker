@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Include local Room database for expenses -->
+    <include domain="database" path="expense_database" />
+    <!-- Include user session and preferences -->
+    <include domain="sharedpref" path="vaulta_user_prefs.xml" />
+</full-backup-content>

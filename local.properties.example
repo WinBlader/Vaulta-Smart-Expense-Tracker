@@ -1,0 +1,11 @@
+## Vaulta - Local Properties Configuration Template
+## Copy this file to local.properties and fill in your actual credentials.
+
+sdk.dir=PATH_TO_YOUR_ANDROID_SDK
+
+# Supabase Authentication & Cloud Backend Configuration
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Google One Tap / Sign-In OAuth 2.0 Web Client ID
+GOOGLE_WEB_CLIENT_ID=your-google-web-client-id.apps.googleusercontent.com

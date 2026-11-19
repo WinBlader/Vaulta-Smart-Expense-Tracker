@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Ambient Outer Drop Shadow -->
+    <path
+        android:pathData="M32,39 L44,39 L54,59 L64,39 L76,39 L56,80 C55,81.5 53,81.5 52,80 L32,39 Z"
+        android:fillColor="#3D000000" />
+    <path
+        android:pathData="M33,38 L44,38 L54,58 L64,38 L75,38 L55.5,78.5 C54.8,79.5 53.2,79.5 52.5,78.5 L33,38 Z"
+        android:fillColor="#22000000" />
+
+    <!-- Left Wing of 'V' (Primary Brilliant White) -->
+    <path
+        android:pathData="M34.5,36 L44,36 L54,56 L54,76.5 C53.2,76.5 52.5,76 52,75.2 L32.5,38.2 C32,37.2 32.8,36 34.5,36 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="32"
+                android:startY="36"
+                android:endX="54"
+                android:endY="76"
+                android:type="linear">
+                <item android:color="#FFFFFFFF" android:offset="0.0" />
+                <item android:color="#FFF8FCFC" android:offset="0.6" />
+                <item android:color="#FFE2F2F0" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Right Wing of 'V' (Dimensional Shading) -->
+    <path
+        android:pathData="M73.5,36 L64,36 L54,56 L54,76.5 C54.8,76.5 55.5,76 56,75.2 L75.5,38.2 C76,37.2 75.2,36 73.5,36 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="76"
+                android:startY="36"
+                android:endX="54"
+                android:endY="76"
+                android:type="linear">
+                <item android:color="#FFE6F4F2" android:offset="0.0" />
+                <item android:color="#FFD6ECE9" android:offset="0.65" />
+                <item android:color="#FFC5E3E0" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center Fold Crease Shadow -->
+    <path
+        android:pathData="M54,56 L57,62 L54,76.5 Z"
+        android:fillColor="#22000000" />
+
+    <!-- Left Edge Crisp Highlight -->
+    <path
+        android:pathData="M34,37 L52.5,75"
+        android:strokeWidth="0.8"
+        android:strokeColor="#50FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- Top Left Cap Highlight -->
+    <path
+        android:pathData="M34.5,36 L43.5,36"
+        android:strokeWidth="1.0"
+        android:strokeColor="#80FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- Emerald Vault Diamond Emblem (Drop Shadow) -->
+    <path
+        android:pathData="M54,37 L61.5,44.5 L54,52 L46.5,44.5 Z"
+        android:fillColor="#26000000" />
+
+    <!-- Emerald Vault Diamond Emblem (Main Body) -->
+    <path
+        android:pathData="M54,35.5 L60.5,43 L54,50.5 L47.5,43 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="47.5"
+                android:startY="35.5"
+                android:endX="60.5"
+                android:endY="50.5"
+                android:type="linear">
+                <item android:color="#FFA7FFEB" android:offset="0.0" />
+                <item android:color="#FF00E676" android:offset="0.5" />
+                <item android:color="#FF00BFA5" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Diamond Inner Reflection Core -->
+    <path
+        android:pathData="M54,38 L58,43 L54,48 L50,43 Z"
+        android:fillColor="#99FFFFFF" />
+
+    <!-- Diamond Brilliant Center Glint -->
+    <path
+        android:pathData="M54,40.5 L56,43 L54,45.5 L52,43 Z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- Little Sparkle at Top Right of V -->
+    <path
+        android:pathData="M78,26 Q78,30 82,30 Q78,30 78,34 Q78,30 74,30 Q78,30 78,26 Z"
+        android:fillColor="#E6A7FFEB" />
+
+</vector>
