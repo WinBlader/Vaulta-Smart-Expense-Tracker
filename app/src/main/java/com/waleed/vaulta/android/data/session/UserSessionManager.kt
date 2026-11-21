@@ -21,6 +21,7 @@ class UserSessionManager @Inject constructor(
 
     companion object {
         private const val KEY_IS_LOGGED_IN = "is_logged_in"
+        private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_PHONE = "user_phone"
@@ -46,8 +47,25 @@ class UserSessionManager @Inject constructor(
         return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
     }
 
+    /**
+     * Returns a unique, normalized account key for the current user.
+     * Guaranteed to partition data between different email, phone, or guest accounts.
+     */
+    fun getCurrentUserKey(): String {
+        val user = _currentUser.value ?: return "guest"
+        val key = when {
+            user.id.isNotBlank() -> user.id.trim()
+            user.email.isNotBlank() -> user.email.trim().lowercase()
+            user.phoneNumber.isNotBlank() -> user.phoneNumber.trim()
+            user.authProvider.contains("Guest", ignoreCase = true) -> "guest"
+            else -> user.name.trim().lowercase()
+        }
+        return key.ifBlank { "guest" }
+    }
+
     private fun loadUserFromPrefs(): UserProfile? {
         if (!isLoggedIn()) return null
+        val id = prefs.getString(KEY_USER_ID, "") ?: ""
         val name = prefs.getString(KEY_USER_NAME, "") ?: ""
         val email = prefs.getString(KEY_USER_EMAIL, "") ?: ""
         val phone = prefs.getString(KEY_USER_PHONE, "") ?: ""
@@ -55,6 +73,7 @@ class UserSessionManager @Inject constructor(
         val isVerified = prefs.getBoolean(KEY_IS_VERIFIED, true)
         val registeredAt = prefs.getLong(KEY_REGISTERED_AT, System.currentTimeMillis())
         return UserProfile(
+            id = id,
             name = name,
             email = email,
             phoneNumber = phone,
@@ -67,6 +86,7 @@ class UserSessionManager @Inject constructor(
     fun saveUser(user: UserProfile) {
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, true)
+            .putString(KEY_USER_ID, user.id)
             .putString(KEY_USER_NAME, user.name)
             .putString(KEY_USER_EMAIL, user.email)
             .putString(KEY_USER_PHONE, user.phoneNumber)
@@ -81,11 +101,13 @@ class UserSessionManager @Inject constructor(
     }
 
     fun updateUser(name: String, email: String, phoneNumber: String) {
+        val currentId = _currentUser.value?.id ?: ""
         val currentProvider = _currentUser.value?.authProvider ?: "Supabase Auth (Verified)"
         val isVerified = _currentUser.value?.isVerified ?: true
         val registeredAt = _currentUser.value?.registeredAt ?: System.currentTimeMillis()
 
         val updatedUser = UserProfile(
+            id = currentId,
             name = name,
             email = email,
             phoneNumber = phoneNumber,
@@ -98,6 +120,7 @@ class UserSessionManager @Inject constructor(
 
     fun loginAsGuest() {
         val guestUser = UserProfile(
+            id = "guest",
             name = "Guest User",
             email = "",
             phoneNumber = "",
@@ -111,6 +134,7 @@ class UserSessionManager @Inject constructor(
     fun logout() {
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)
+            .remove(KEY_USER_ID)
             .remove(KEY_USER_NAME)
             .remove(KEY_USER_EMAIL)
             .remove(KEY_USER_PHONE)
@@ -139,6 +163,7 @@ class UserSessionManager @Inject constructor(
                 val obj = jsonArray.getJSONObject(i)
                 list.add(
                     UserProfile(
+                        id = obj.optString("id", ""),
                         name = obj.optString("name", ""),
                         email = obj.optString("email", ""),
                         phoneNumber = obj.optString("phoneNumber", ""),
@@ -174,6 +199,7 @@ class UserSessionManager @Inject constructor(
             val jsonArray = JSONArray()
             for (acc in currentAccounts) {
                 val obj = JSONObject().apply {
+                    put("id", acc.id)
                     put("name", acc.name)
                     put("email", acc.email)
                     put("phoneNumber", acc.phoneNumber)

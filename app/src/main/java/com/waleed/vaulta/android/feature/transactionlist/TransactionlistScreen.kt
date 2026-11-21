@@ -92,6 +92,7 @@ fun TransactionListScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     var showCustomDatePicker by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var showExportPdfDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.navigationEvent.collect { event ->
@@ -157,6 +158,95 @@ fun TransactionListScreen(
         }
     }
 
+    // Export Statement PDF Dialog (Direct Download & Share)
+    if (showExportPdfDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showExportPdfDialog = false },
+            title = {
+                Text(
+                    text = "Export Financial Statement",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Period: ${uiState.dateRange} • ${uiState.transactions.size} records",
+                        fontSize = 13.5.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Net Balance: ${Utils.formatCurrency(uiState.netBalance)}",
+                        fontSize = 13.sp,
+                        color = if (uiState.netBalance >= 0) Green else Red,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Choose whether to directly save the statement PDF to your device's Downloads/Vaulta folder or share it via the Android share sheet.",
+                        fontSize = 12.sp,
+                        color = LightGrey,
+                        lineHeight = 16.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Direct Download PDF Button
+                    Button(
+                        onClick = {
+                            showExportPdfDialog = false
+                            ReceiptExportManager.downloadTransactionsStatementPdf(
+                                context = context,
+                                transactions = uiState.transactions,
+                                filterType = uiState.filterType,
+                                dateRange = uiState.dateRange,
+                                totalIncome = uiState.totalIncome,
+                                totalExpense = uiState.totalExpense,
+                                netBalance = uiState.netBalance
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("📥 Download", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Share PDF Button
+                    OutlinedButton(
+                        onClick = {
+                            showExportPdfDialog = false
+                            ReceiptExportManager.exportTransactionsStatementPdf(
+                                context = context,
+                                transactions = uiState.transactions,
+                                filterType = uiState.filterType,
+                                dateRange = uiState.dateRange,
+                                totalIncome = uiState.totalIncome,
+                                totalExpense = uiState.totalExpense,
+                                netBalance = uiState.netBalance
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Share PDF", fontSize = 12.sp)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportPdfDialog = false }) {
+                    Text("Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             Column(
@@ -201,15 +291,7 @@ fun TransactionListScreen(
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                 .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                                 .clickable {
-                                    ReceiptExportManager.exportTransactionsStatementPdf(
-                                        context = context,
-                                        transactions = uiState.transactions,
-                                        filterType = uiState.filterType,
-                                        dateRange = uiState.dateRange,
-                                        totalIncome = uiState.totalIncome,
-                                        totalExpense = uiState.totalExpense,
-                                        netBalance = uiState.netBalance
-                                    )
+                                    showExportPdfDialog = true
                                 }
                                 .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {

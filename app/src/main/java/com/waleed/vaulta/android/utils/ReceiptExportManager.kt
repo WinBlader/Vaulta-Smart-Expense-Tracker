@@ -1,5 +1,6 @@
 package com.waleed.vaulta.android.utils
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -9,6 +10,10 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import java.io.File
@@ -25,6 +30,70 @@ object ReceiptExportManager {
             dir.mkdirs()
         }
         return dir
+    }
+
+    /**
+     * Opens a PDF document URI with any installed PDF viewer app.
+     */
+    fun openPdf(context: Context, uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(intent, "Open PDF"))
+        } catch (_: Exception) {
+            VaultaToast.show(context, "No PDF viewer app found on device.")
+        }
+    }
+
+    /**
+     * Saves a generated PDF document directly into the device's public Downloads directory
+     * under Environment.DIRECTORY_DOWNLOADS/Vaulta using MediaStore on Android 10+ (API 29+).
+     */
+    fun savePdfToPublicDownloads(context: Context, pdfDocument: PdfDocument, baseFileName: String): Uri? {
+        val fileName = if (baseFileName.endsWith(".pdf", ignoreCase = true)) baseFileName else "$baseFileName.pdf"
+        var savedUri: Uri? = null
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Vaulta")
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        pdfDocument.writeTo(out)
+                    }
+                    savedUri = uri
+                }
+            } else {
+                val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val vaultaFolder = File(publicDownloads, "Vaulta")
+                if (!vaultaFolder.exists()) {
+                    vaultaFolder.mkdirs()
+                }
+                val targetFile = File(vaultaFolder, fileName)
+                FileOutputStream(targetFile).use { out ->
+                    pdfDocument.writeTo(out)
+                }
+                savedUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", targetFile)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            try {
+                val fallbackFile = File(getExportsDir(context), fileName)
+                FileOutputStream(fallbackFile).use { out ->
+                    pdfDocument.writeTo(out)
+                }
+                savedUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fallbackFile)
+            } catch (_: Exception) {}
+        }
+
+        return savedUri
     }
 
     /**
@@ -178,9 +247,9 @@ object ReceiptExportManager {
     }
 
     /**
-     * Shares a single transaction receipt as a high-quality PDF.
+     * Renders a single transaction receipt into an A4 PdfDocument.
      */
-    fun shareTransactionReceiptAsPdf(context: Context, item: ExpenseEntity) {
+    fun createReceiptPdfDocument(item: ExpenseEntity): PdfDocument {
         val pdfDocument = PdfDocument()
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4
         val page = pdfDocument.startPage(pageInfo)
@@ -293,7 +362,36 @@ object ReceiptExportManager {
         canvas.drawText("from winblader.org • Vaulta Smart Expense Tracker", 297.5f, 790f, paint)
 
         pdfDocument.finishPage(page)
+        return pdfDocument
+    }
 
+    /**
+     * Downloads a single transaction receipt PDF directly into public Downloads/Vaulta.
+     */
+    fun downloadTransactionReceiptPdf(context: Context, item: ExpenseEntity): Uri? {
+        val pdfDocument = createReceiptPdfDocument(item)
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "Vaulta_Receipt_${item.id ?: timestamp}.pdf"
+        val uri = savePdfToPublicDownloads(context, pdfDocument, fileName)
+        pdfDocument.close()
+
+        if (uri != null) {
+            VaultaToast.showWithAction(
+                message = "PDF saved to Downloads/Vaulta",
+                actionLabel = "OPEN",
+                onAction = { openPdf(context, uri) }
+            )
+        } else {
+            VaultaToast.show(context, "Failed to download PDF receipt.")
+        }
+        return uri
+    }
+
+    /**
+     * Shares a single transaction receipt as a high-quality PDF.
+     */
+    fun shareTransactionReceiptAsPdf(context: Context, item: ExpenseEntity) {
+        val pdfDocument = createReceiptPdfDocument(item)
         val file = File(getExportsDir(context), "vaulta_receipt_${item.id ?: System.currentTimeMillis()}.pdf")
         FileOutputStream(file).use { out ->
             pdfDocument.writeTo(out)
@@ -315,17 +413,16 @@ object ReceiptExportManager {
     }
 
     /**
-     * Exports a multi-transaction statement PDF for active filtered transactions.
+     * Renders a multi-transaction statement into a multi-page A4 PdfDocument.
      */
-    fun exportTransactionsStatementPdf(
-        context: Context,
+    fun createTransactionsStatementPdfDocument(
         transactions: List<ExpenseEntity>,
         filterType: String,
         dateRange: String,
         totalIncome: Double,
         totalExpense: Double,
         netBalance: Double
-    ) {
+    ): PdfDocument {
         val pdfDocument = PdfDocument()
         val itemsPerPage = 22
         val totalPages = if (transactions.isEmpty()) 1 else ((transactions.size - 1) / itemsPerPage) + 1
@@ -471,7 +568,56 @@ object ReceiptExportManager {
 
             pdfDocument.finishPage(page)
         }
+        return pdfDocument
+    }
 
+    /**
+     * Downloads a multi-transaction statement PDF directly into public Downloads/Vaulta.
+     */
+    fun downloadTransactionsStatementPdf(
+        context: Context,
+        transactions: List<ExpenseEntity>,
+        filterType: String,
+        dateRange: String,
+        totalIncome: Double,
+        totalExpense: Double,
+        netBalance: Double
+    ): Uri? {
+        val pdfDocument = createTransactionsStatementPdfDocument(
+            transactions, filterType, dateRange, totalIncome, totalExpense, netBalance
+        )
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "Vaulta_Statement_$timestamp.pdf"
+        val uri = savePdfToPublicDownloads(context, pdfDocument, fileName)
+        pdfDocument.close()
+
+        if (uri != null) {
+            VaultaToast.showWithAction(
+                message = "PDF saved to Downloads/Vaulta",
+                actionLabel = "OPEN",
+                onAction = { openPdf(context, uri) }
+            )
+        } else {
+            VaultaToast.show(context, "Failed to download Statement PDF.")
+        }
+        return uri
+    }
+
+    /**
+     * Exports a multi-transaction statement PDF for active filtered transactions via share sheet.
+     */
+    fun exportTransactionsStatementPdf(
+        context: Context,
+        transactions: List<ExpenseEntity>,
+        filterType: String,
+        dateRange: String,
+        totalIncome: Double,
+        totalExpense: Double,
+        netBalance: Double
+    ) {
+        val pdfDocument = createTransactionsStatementPdfDocument(
+            transactions, filterType, dateRange, totalIncome, totalExpense, netBalance
+        )
         val file = File(getExportsDir(context), "vaulta_statement_${System.currentTimeMillis()}.pdf")
         FileOutputStream(file).use { out ->
             pdfDocument.writeTo(out)

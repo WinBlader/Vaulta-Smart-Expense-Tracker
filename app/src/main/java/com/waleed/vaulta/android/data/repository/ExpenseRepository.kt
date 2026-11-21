@@ -4,8 +4,11 @@ import com.waleed.vaulta.android.data.budget.BudgetManager
 import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.ExpenseSummary
+import com.waleed.vaulta.android.data.session.UserSessionManager
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,30 +19,48 @@ interface ExpenseRepository {
     suspend fun insertExpense(expense: ExpenseEntity): Boolean
     suspend fun updateExpense(expense: ExpenseEntity): Boolean
     suspend fun deleteExpense(expense: ExpenseEntity): Boolean
+    suspend fun clearCurrentUserData()
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class ExpenseRepositoryImpl @Inject constructor(
     private val dao: ExpenseDao,
-    private val budgetManager: BudgetManager
+    private val budgetManager: BudgetManager,
+    private val sessionManager: UserSessionManager
 ) : ExpenseRepository {
 
     override fun getAllExpenses(): Flow<List<ExpenseEntity>> {
-        return dao.getAllExpense()
+        return sessionManager.currentUser.flatMapLatest {
+            val userKey = sessionManager.getCurrentUserKey()
+            dao.getAllExpenseForUser(userKey)
+        }
     }
 
     override fun getTopExpenses(): Flow<List<ExpenseEntity>> {
-        return dao.getTopExpenses()
+        return sessionManager.currentUser.flatMapLatest {
+            val userKey = sessionManager.getCurrentUserKey()
+            dao.getTopExpensesForUser(userKey)
+        }
     }
 
     override fun getAllExpenseByDate(type: String): Flow<List<ExpenseSummary>> {
-        return dao.getAllExpenseByDate(type)
+        return sessionManager.currentUser.flatMapLatest {
+            val userKey = sessionManager.getCurrentUserKey()
+            dao.getAllExpenseByDateForUser(type, userKey)
+        }
     }
 
     override suspend fun insertExpense(expense: ExpenseEntity): Boolean {
         return try {
-            dao.insertExpense(expense)
-            val updated = dao.getAllExpense().first()
+            val userKey = sessionManager.getCurrentUserKey()
+            val toSave = if (expense.userId.isBlank() || expense.userId == "guest") {
+                expense.copy(userId = userKey)
+            } else {
+                expense
+            }
+            dao.insertExpense(toSave)
+            val updated = dao.getAllExpenseForUser(userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             true
@@ -50,8 +71,14 @@ class ExpenseRepositoryImpl @Inject constructor(
 
     override suspend fun updateExpense(expense: ExpenseEntity): Boolean {
         return try {
-            dao.updateExpense(expense)
-            val updated = dao.getAllExpense().first()
+            val userKey = sessionManager.getCurrentUserKey()
+            val toSave = if (expense.userId.isBlank() || expense.userId == "guest") {
+                expense.copy(userId = userKey)
+            } else {
+                expense
+            }
+            dao.updateExpense(toSave)
+            val updated = dao.getAllExpenseForUser(userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             true
@@ -62,13 +89,21 @@ class ExpenseRepositoryImpl @Inject constructor(
 
     override suspend fun deleteExpense(expense: ExpenseEntity): Boolean {
         return try {
+            val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpense(expense)
-            val updated = dao.getAllExpense().first()
+            val updated = dao.getAllExpenseForUser(userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             true
         } catch (_: Exception) {
             false
         }
+    }
+
+    override suspend fun clearCurrentUserData() {
+        try {
+            val userKey = sessionManager.getCurrentUserKey()
+            dao.deleteExpensesForUser(userKey)
+        } catch (_: Exception) {}
     }
 }

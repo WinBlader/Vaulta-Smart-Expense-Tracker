@@ -131,31 +131,47 @@ fun TransactionReceiptDialog(
             }
         },
         confirmButton = {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Download PDF Button
+                    Button(
+                        onClick = {
+                            ReceiptExportManager.downloadTransactionReceiptPdf(context, item)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("📥 Download PDF", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Share PDF Button
+                    OutlinedButton(
+                        onClick = {
+                            ReceiptExportManager.shareTransactionReceiptAsPdf(context, item)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Share PDF", fontSize = 12.sp)
+                    }
+                }
+
                 // Share PNG Button
                 OutlinedButton(
                     onClick = {
                         ReceiptExportManager.shareTransactionReceiptAsImage(context, item)
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("PNG Image", fontSize = 13.sp)
-                }
-
-                // Share PDF Button
-                Button(
-                    onClick = {
-                        ReceiptExportManager.shareTransactionReceiptAsPdf(context, item)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("PDF Doc", fontSize = 13.sp, color = Color.White)
+                    Text("Share PNG Image", fontSize = 12.5.sp)
                 }
             }
         },

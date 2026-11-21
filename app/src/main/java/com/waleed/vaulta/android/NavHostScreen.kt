@@ -1,6 +1,8 @@
 package com.waleed.vaulta.android
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Icon
@@ -12,10 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,6 +37,7 @@ import com.waleed.vaulta.android.feature.stats.StatsScreen
 import com.waleed.vaulta.android.feature.transactionlist.TransactionListScreen
 import com.waleed.vaulta.android.ui.theme.Zinc
 import com.waleed.vaulta.android.utils.NavRouts
+import com.waleed.vaulta.android.widget.VaultaSnackbarHost
 
 @Composable
 fun NavHostScreen(
@@ -43,76 +49,85 @@ fun NavHostScreen(
     }
     val startDest = NavRouts.splash
 
-    Scaffold(bottomBar = {
-        AnimatedVisibility(visible = bottomBarVisibility) {
-            NavigationBottomBar(
-                navController = navController,
-                items = listOf(
-                    NavItem(route = "/home", icon = R.drawable.ic_home),
-                    NavItem(route = "/stats", icon = R.drawable.ic_stats),
-                    NavItem(route = "/profile", icon = R.drawable.ic_profile)
-                )
-            )
-        }
-    }) {
-        NavHost(
-            navController = navController,
-            startDestination = startDest,
-            modifier = Modifier.padding(it)
-        ) {
-            composable(route = NavRouts.splash) {
-                bottomBarVisibility = false
-                SplashScreen(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(bottomBar = {
+            AnimatedVisibility(visible = bottomBarVisibility) {
+                NavigationBottomBar(
                     navController = navController,
-                    isLoggedIn = isLoggedIn
+                    items = listOf(
+                        NavItem(route = "/home", icon = R.drawable.ic_home),
+                        NavItem(route = "/stats", icon = R.drawable.ic_stats),
+                        NavItem(route = "/profile", icon = R.drawable.ic_profile)
+                    )
                 )
             }
+        }) {
+            NavHost(
+                navController = navController,
+                startDestination = startDest,
+                modifier = Modifier.padding(it)
+            ) {
+                composable(route = NavRouts.splash) {
+                    bottomBarVisibility = false
+                    SplashScreen(
+                        navController = navController,
+                        isLoggedIn = isLoggedIn
+                    )
+                }
 
-            composable(route = "/login") {
-                bottomBarVisibility = false
-                LoginScreen(navController)
-            }
+                composable(route = "/login") {
+                    bottomBarVisibility = false
+                    LoginScreen(navController)
+                }
 
-            composable(route = "/signup") {
-                bottomBarVisibility = false
-                RegisterScreen(navController)
-            }
+                composable(route = "/signup") {
+                    bottomBarVisibility = false
+                    RegisterScreen(navController)
+                }
 
-            composable(route = "/home") {
-                bottomBarVisibility = true
-                HomeScreen(navController)
-            }
+                composable(route = "/home") {
+                    bottomBarVisibility = true
+                    HomeScreen(navController)
+                }
 
-            composable(route = "/add_income") {
-                bottomBarVisibility = false
-                AddExpense(navController, isIncome = true)
-            }
+                composable(route = "/add_income") {
+                    bottomBarVisibility = false
+                    AddExpense(navController, isIncome = true)
+                }
 
-            composable(route = "/add_exp") {
-                bottomBarVisibility = false
-                AddExpense(navController, isIncome = false)
-            }
+                composable(route = "/add_exp") {
+                    bottomBarVisibility = false
+                    AddExpense(navController, isIncome = false)
+                }
 
-            composable(route = "/stats") {
-                bottomBarVisibility = true
-                StatsScreen(navController)
-            }
+                composable(route = "/stats") {
+                    bottomBarVisibility = true
+                    StatsScreen(navController)
+                }
 
-            composable(route = NavRouts.spends_dashboard) {
-                bottomBarVisibility = false
-                SpendsDashboardScreen(navController)
-            }
+                composable(route = NavRouts.spends_dashboard) {
+                    bottomBarVisibility = false
+                    SpendsDashboardScreen(navController)
+                }
 
-            composable(route = "/all_transactions") {
-                bottomBarVisibility = true
-                TransactionListScreen(navController)
-            }
+                composable(route = "/all_transactions") {
+                    bottomBarVisibility = true
+                    TransactionListScreen(navController)
+                }
 
-            composable(route = "/profile") {
-                bottomBarVisibility = true
-                ProfileScreen(navController)
+                composable(route = "/profile") {
+                    bottomBarVisibility = true
+                    ProfileScreen(navController)
+                }
             }
         }
+
+        VaultaSnackbarHost(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (bottomBarVisibility) 92.dp else 24.dp)
+                .zIndex(999f)
+        )
     }
 }
 

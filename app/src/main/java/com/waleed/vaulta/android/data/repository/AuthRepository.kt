@@ -3,6 +3,8 @@ package com.waleed.vaulta.android.data.repository
 import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseAuthService
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseUser
+import com.waleed.vaulta.android.data.budget.BudgetManager
+import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import io.github.jan.supabase.auth.status.SessionStatus
@@ -72,7 +74,9 @@ interface AuthRepository {
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val supabaseAuthService: SupabaseAuthService,
-    private val sessionManager: UserSessionManager
+    private val sessionManager: UserSessionManager,
+    private val expenseDao: ExpenseDao,
+    private val budgetManager: BudgetManager
 ) : AuthRepository {
 
     override val currentUser: StateFlow<UserProfile?> = sessionManager.currentUser
@@ -210,6 +214,12 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun signOut(): Result<Unit> {
+        val userKey = sessionManager.getCurrentUserKey()
+        try {
+            // Defense-in-depth: Delete RoomDB cached records for this account on sign-out
+            expenseDao.deleteExpensesForUser(userKey)
+            budgetManager.resetBudgetForUser(userKey)
+        } catch (_: Exception) {}
         return supabaseAuthService.signOut()
     }
 
@@ -242,6 +252,10 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override fun logout() {
+        val userKey = sessionManager.getCurrentUserKey()
+        try {
+            budgetManager.resetBudgetForUser(userKey)
+        } catch (_: Exception) {}
         sessionManager.logout()
     }
 

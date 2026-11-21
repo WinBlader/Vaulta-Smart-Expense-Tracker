@@ -3,11 +3,15 @@ package com.waleed.vaulta.android.data.budget
 import android.content.Context
 import android.content.SharedPreferences
 import com.waleed.vaulta.android.data.model.ExpenseEntity
+import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,23 +19,30 @@ import javax.inject.Singleton
 @Singleton
 class BudgetManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val notificationHelper: BudgetNotificationHelper
+    private val notificationHelper: BudgetNotificationHelper,
+    private val sessionManager: UserSessionManager
 ) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("vaulta_budget_prefs", Context.MODE_PRIVATE)
 
-    companion object {
-        private const val KEY_MONTHLY_BUDGET = "monthly_budget_amount"
-        private const val KEY_LAST_ALERT_LEVEL = "budget_last_alert_level" // 0 = none, 1 = warning (80%), 2 = exceeded (100%)
-        private const val KEY_LAST_ALERT_MONTH = "budget_last_alert_month"
-        private const val KEY_LAST_NEGATIVE_BALANCE_NOTIFIED = "budget_last_negative_balance_notified"
-    }
+    private fun getBudgetKey(): String = "monthly_budget_amount_${sessionManager.getCurrentUserKey()}"
+    private fun getAlertLevelKey(): String = "budget_last_alert_level_${sessionManager.getCurrentUserKey()}"
+    private fun getAlertMonthKey(): String = "budget_last_alert_month_${sessionManager.getCurrentUserKey()}"
+    private fun getNegativeNotifiedKey(): String = "budget_last_negative_balance_notified_${sessionManager.getCurrentUserKey()}"
 
     private val _monthlyBudget = MutableStateFlow(loadBudgetFromPrefs())
     val monthlyBudget: StateFlow<Double> = _monthlyBudget.asStateFlow()
 
+    init {
+        CoroutineScope(Dispatchers.Main).launch {
+            sessionManager.currentUser.collect {
+                _monthlyBudget.value = loadBudgetFromPrefs()
+            }
+        }
+    }
+
     private fun loadBudgetFromPrefs(): Double {
-        return prefs.getString(KEY_MONTHLY_BUDGET, "0.0")?.toDoubleOrNull() ?: 0.0
+        return prefs.getString(getBudgetKey(), "0.0")?.toDoubleOrNull() ?: 0.0
     }
 
     private fun getCurrentMonthKey(): String {
@@ -40,22 +51,22 @@ class BudgetManager @Inject constructor(
     }
 
     private fun getSavedAlertLevel(): Int {
-        val savedMonth = prefs.getString(KEY_LAST_ALERT_MONTH, "") ?: ""
+        val savedMonth = prefs.getString(getAlertMonthKey(), "") ?: ""
         if (savedMonth != getCurrentMonthKey()) {
             // New month started, reset alert level
             prefs.edit()
-                .putString(KEY_LAST_ALERT_MONTH, getCurrentMonthKey())
-                .putInt(KEY_LAST_ALERT_LEVEL, 0)
+                .putString(getAlertMonthKey(), getCurrentMonthKey())
+                .putInt(getAlertLevelKey(), 0)
                 .apply()
             return 0
         }
-        return prefs.getInt(KEY_LAST_ALERT_LEVEL, 0)
+        return prefs.getInt(getAlertLevelKey(), 0)
     }
 
     private fun saveAlertLevel(level: Int) {
         prefs.edit()
-            .putString(KEY_LAST_ALERT_MONTH, getCurrentMonthKey())
-            .putInt(KEY_LAST_ALERT_LEVEL, level)
+            .putString(getAlertMonthKey(), getCurrentMonthKey())
+            .putInt(getAlertLevelKey(), level)
             .apply()
     }
 
@@ -66,15 +77,25 @@ class BudgetManager @Inject constructor(
     fun setMonthlyBudget(amount: Double, currentExpenses: List<ExpenseEntity> = emptyList()) {
         val validAmount = amount.coerceAtLeast(0.0)
         prefs.edit()
-            .putString(KEY_MONTHLY_BUDGET, validAmount.toString())
-            .putInt(KEY_LAST_ALERT_LEVEL, 0) // Reset alert level so new budget is evaluated fresh
-            .putString(KEY_LAST_ALERT_MONTH, getCurrentMonthKey())
+            .putString(getBudgetKey(), validAmount.toString())
+            .putInt(getAlertLevelKey(), 0) // Reset alert level so new budget is evaluated fresh
+            .putString(getAlertMonthKey(), getCurrentMonthKey())
             .apply()
         _monthlyBudget.value = validAmount
 
         if (currentExpenses.isNotEmpty() && validAmount > 0.0) {
             checkBudgetAndNotify(currentExpenses)
         }
+    }
+
+    fun resetBudgetForUser(userKey: String) {
+        prefs.edit()
+            .remove("monthly_budget_amount_$userKey")
+            .remove("budget_last_alert_level_$userKey")
+            .remove("budget_last_alert_month_$userKey")
+            .remove("budget_last_negative_balance_notified_$userKey")
+            .apply()
+        _monthlyBudget.value = 0.0
     }
 
     fun calculateCurrentMonthSpends(expenses: List<ExpenseEntity>): Double {
@@ -149,17 +170,17 @@ class BudgetManager @Inject constructor(
             }
         }
         val currentBalance = totalIncome - totalExpense
-        val wasNegativeNotified = prefs.getBoolean(KEY_LAST_NEGATIVE_BALANCE_NOTIFIED, false)
+        val wasNegativeNotified = prefs.getBoolean(getNegativeNotifiedKey(), false)
 
         if (currentBalance < 0.0) {
             if (!wasNegativeNotified || forceNotifyIfNegative) {
                 notificationHelper.sendNegativeBalanceNotification(currentBalance, totalIncome, totalExpense)
-                prefs.edit().putBoolean(KEY_LAST_NEGATIVE_BALANCE_NOTIFIED, true).apply()
+                prefs.edit().putBoolean(getNegativeNotifiedKey(), true).apply()
             }
         } else {
             // Balance recovered back to zero or positive, reset flag so user is notified if it drops again
             if (wasNegativeNotified) {
-                prefs.edit().putBoolean(KEY_LAST_NEGATIVE_BALANCE_NOTIFIED, false).apply()
+                prefs.edit().putBoolean(getNegativeNotifiedKey(), false).apply()
             }
         }
     }

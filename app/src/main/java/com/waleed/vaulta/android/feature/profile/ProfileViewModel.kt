@@ -136,6 +136,7 @@ class ProfileViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(showLogoutConfirm = false)
                 viewModelScope.launch {
                     authRepository.signOut()
+                    com.waleed.vaulta.android.utils.VaultaToast.show(message = "Logged out successfully.")
                     _navigationEvent.emit(ProfileNavigationEvent.NavigateToLogin)
                 }
             }

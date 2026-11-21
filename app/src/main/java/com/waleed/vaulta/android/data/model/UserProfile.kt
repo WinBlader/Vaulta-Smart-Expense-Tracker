@@ -1,6 +1,7 @@
 package com.waleed.vaulta.android.data.model
 
 data class UserProfile(
+    val id: String = "",
     val name: String,
     val email: String,
     val phoneNumber: String,
