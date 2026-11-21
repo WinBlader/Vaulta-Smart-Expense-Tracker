@@ -5,10 +5,12 @@ import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.ExpenseSummary
 import com.waleed.vaulta.android.data.session.UserSessionManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,8 +53,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun insertExpense(expense: ExpenseEntity): Boolean {
-        return try {
+    override suspend fun insertExpense(expense: ExpenseEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
             val userKey = sessionManager.getCurrentUserKey()
             val toSave = if (expense.userId.isBlank() || expense.userId == "guest") {
                 expense.copy(userId = userKey)
@@ -69,8 +71,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateExpense(expense: ExpenseEntity): Boolean {
-        return try {
+    override suspend fun updateExpense(expense: ExpenseEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
             val userKey = sessionManager.getCurrentUserKey()
             val toSave = if (expense.userId.isBlank() || expense.userId == "guest") {
                 expense.copy(userId = userKey)
@@ -87,8 +89,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun deleteExpense(expense: ExpenseEntity): Boolean {
-        return try {
+    override suspend fun deleteExpense(expense: ExpenseEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpense(expense)
             val updated = dao.getAllExpenseForUser(userKey).first()
@@ -100,7 +102,7 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun clearCurrentUserData() {
+    override suspend fun clearCurrentUserData() = withContext(Dispatchers.IO) {
         try {
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)

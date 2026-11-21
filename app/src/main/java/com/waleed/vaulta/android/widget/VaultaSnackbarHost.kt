@@ -1,5 +1,8 @@
 package com.waleed.vaulta.android.widget
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,11 +27,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,7 +82,30 @@ object VaultaSnackbarController {
 fun VaultaSnackbarHost(
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val message by VaultaSnackbarController.currentMessage.collectAsState()
+
+    // Safely load the application icon as a rasterized ImageBitmap
+    // Avoids IllegalArgumentException thrown by Compose when painterResource encounters adaptive-icon XMLs
+    val appIconBitmap: ImageBitmap? = remember(context) {
+        try {
+            val drawable = context.packageManager.getApplicationIcon(context.packageName)
+            val bmp = if (drawable is BitmapDrawable && drawable.bitmap != null) {
+                drawable.bitmap
+            } else {
+                val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
+                val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                drawable.setBounds(0, 0, canvas.width, canvas.height)
+                drawable.draw(canvas)
+                bitmap
+            }
+            bmp.asImageBitmap()
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
     LaunchedEffect(message?.id) {
         val current = message ?: return@LaunchedEffect
@@ -105,14 +135,24 @@ fun VaultaSnackbarHost(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Vaulta App Icon
-                    Image(
-                        painter = painterResource(id = R.mipmap.final_icon),
-                        contentDescription = "Vaulta Logo",
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                    )
+                    // Safe App Icon Rendering
+                    if (appIconBitmap != null) {
+                        Image(
+                            bitmap = appIconBitmap,
+                            contentDescription = "Vaulta Logo",
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.money_icon),
+                            contentDescription = "Vaulta Logo",
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                        )
+                    }
 
                     // Message Text
                     Text(

@@ -88,9 +88,13 @@ fun RegisterScreen(
         viewModel.navigationEvent.collect { event ->
             when (event) {
                 AuthNavigationEvent.NavigateToHome -> {
-                    navController.navigate("/home") {
-                        popUpTo("/signup") { inclusive = true }
-                        popUpTo("/login") { inclusive = true }
+                    try {
+                        navController.navigate("/home") {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } catch (_: Exception) {
+                        navController.navigate("/home")
                     }
                 }
                 AuthNavigationEvent.NavigateToLogin -> {

@@ -8,8 +8,10 @@ import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import io.github.jan.supabase.auth.status.SessionStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -213,14 +215,16 @@ class AuthRepositoryImpl @Inject constructor(
         return supabaseAuthService.resetPasswordForEmail(email)
     }
 
-    override suspend fun signOut(): Result<Unit> {
+    override suspend fun signOut(): Result<Unit> = withContext(Dispatchers.IO) {
         val userKey = sessionManager.getCurrentUserKey()
         try {
             // Defense-in-depth: Delete RoomDB cached records for this account on sign-out
             expenseDao.deleteExpensesForUser(userKey)
             budgetManager.resetBudgetForUser(userKey)
-        } catch (_: Exception) {}
-        return supabaseAuthService.signOut()
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Error cleaning up local user data on sign out", e)
+        }
+        return@withContext supabaseAuthService.signOut()
     }
 
     override suspend fun signInWithGoogleAccount(

@@ -96,8 +96,13 @@ fun ProfileScreen(
         viewModel.navigationEvent.collect { event ->
             when (event) {
                 ProfileNavigationEvent.NavigateToLogin -> {
-                    navController.navigate("/login") {
-                        popUpTo(0) { inclusive = true }
+                    try {
+                        navController.navigate("/login") {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } catch (_: Exception) {
+                        navController.navigate("/login")
                     }
                 }
                 else -> {}

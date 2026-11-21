@@ -34,7 +34,7 @@ class BudgetManager @Inject constructor(
     val monthlyBudget: StateFlow<Double> = _monthlyBudget.asStateFlow()
 
     init {
-        CoroutineScope(Dispatchers.Main).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             sessionManager.currentUser.collect {
                 _monthlyBudget.value = loadBudgetFromPrefs()
             }
@@ -42,7 +42,11 @@ class BudgetManager @Inject constructor(
     }
 
     private fun loadBudgetFromPrefs(): Double {
-        return prefs.getString(getBudgetKey(), "0.0")?.toDoubleOrNull() ?: 0.0
+        return try {
+            prefs.getString(getBudgetKey(), "0.0")?.toDoubleOrNull() ?: 0.0
+        } catch (_: Exception) {
+            0.0
+        }
     }
 
     private fun getCurrentMonthKey(): String {
