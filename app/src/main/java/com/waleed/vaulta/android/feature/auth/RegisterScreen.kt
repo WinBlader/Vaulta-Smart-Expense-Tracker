@@ -306,43 +306,69 @@ fun RegisterScreen(
                         letterSpacing = 1.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = uiState.mobileNumber,
-                        onValueChange = { newValue ->
-                            if (newValue.length <= 10 && newValue.all { it.isDigit() }) {
-                                viewModel.onEvent(RegisterUiEvent.OnMobileChanged(newValue))
-                            }
-                        },
-                        placeholder = { ExpenseTextView(text = "10-digit number", color = LightGrey) },
-                        leadingIcon = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 12.dp, end = 6.dp)
-                            ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Editable Country Code
+                        OutlinedTextField(
+                            value = uiState.countryCode,
+                            onValueChange = { input ->
+                                val sanitized = if (input.startsWith("+")) {
+                                    "+" + input.drop(1).filter { it.isDigit() }.take(4)
+                                } else {
+                                    "+" + input.filter { it.isDigit() }.take(4)
+                                }
+                                viewModel.onEvent(RegisterUiEvent.OnCountryCodeChanged(sanitized))
+                            },
+                            placeholder = { Text("+91", color = LightGrey, fontSize = 14.sp) },
+                            modifier = Modifier.width(84.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = InterFontFamily,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+
+                        // Mobile Number
+                        OutlinedTextField(
+                            value = uiState.mobileNumber,
+                            onValueChange = { newValue ->
+                                val digitsOnly = newValue.filter { it.isDigit() }.take(14)
+                                viewModel.onEvent(RegisterUiEvent.OnMobileChanged(digitsOnly))
+                            },
+                            placeholder = { ExpenseTextView(text = "9876543210", color = LightGrey) },
+                            leadingIcon = {
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_phone),
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "+91",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = InterFontFamily),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = InterFontFamily,
+                                fontSize = 14.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
                         )
-                    )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

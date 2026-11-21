@@ -1,5 +1,6 @@
 package com.waleed.vaulta.android.data.repository
 
+import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseAuthService
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseUser
 import com.waleed.vaulta.android.data.model.UserProfile
@@ -29,8 +30,16 @@ interface AuthRepository {
         password: String
     ): Result<SupabaseUser>
 
+    suspend fun registerWithPhone(
+        username: String,
+        countryCode: String,
+        mobileNumber: String,
+        password: String
+    ): Result<SupabaseUser>
+
     suspend fun loginWithEmail(email: String, password: String): Result<SupabaseUser>
     suspend fun loginWithPhone(phone: String, password: String): Result<SupabaseUser>
+    suspend fun loginWithPhone(countryCode: String, mobileNumber: String, password: String): Result<SupabaseUser>
     suspend fun loginWithGoogle(name: String, email: String, phone: String): Result<SupabaseUser>
     suspend fun sendEmailOtp(email: String): Result<String>
     suspend fun verifyEmailOtp(email: String, token: String): Result<SupabaseUser>
@@ -86,12 +95,31 @@ class AuthRepositoryImpl @Inject constructor(
         phone: String,
         password: String
     ): Result<SupabaseUser> {
-        val fakeEmail = "${phone.filter { it.isDigit() }}@vaulta.app"
+        val trimmed = phone.trim()
+        val digits = trimmed.filter { it.isDigit() }
+        val (countryCode, local) = if (trimmed.startsWith("+91") && digits.length >= 12) {
+            "+91" to digits.substring(2)
+        } else if (trimmed.startsWith("+") && digits.length > 10) {
+            val codeLen = digits.length - 10
+            "+${digits.take(codeLen)}" to digits.drop(codeLen)
+        } else {
+            "+91" to digits
+        }
+        return registerWithPhone(username, countryCode, local, password)
+    }
+
+    override suspend fun registerWithPhone(
+        username: String,
+        countryCode: String,
+        mobileNumber: String,
+        password: String
+    ): Result<SupabaseUser> {
+        val normalized = PhoneNormalizationUtils.normalizePhone(countryCode, mobileNumber)
         return supabaseAuthService.registerWithEmail(
             username = username,
-            email = fakeEmail,
+            email = normalized.loginEmail,
             password = password,
-            phone = phone
+            phone = normalized.fullE164
         )
     }
 
@@ -106,12 +134,38 @@ class AuthRepositoryImpl @Inject constructor(
         phone: String,
         password: String
     ): Result<SupabaseUser> {
-        val fakeEmail = "${phone.filter { it.isDigit() }}@vaulta.app"
-        val result = supabaseAuthService.loginWithEmail(fakeEmail, password)
+        val trimmed = phone.trim()
+        val digits = trimmed.filter { it.isDigit() }
+        val (countryCode, local) = if (trimmed.startsWith("+91") && digits.length >= 12) {
+            "+91" to digits.substring(2)
+        } else if (trimmed.startsWith("+") && digits.length > 10) {
+            val codeLen = digits.length - 10
+            "+${digits.take(codeLen)}" to digits.drop(codeLen)
+        } else {
+            "+91" to digits
+        }
+        return loginWithPhone(countryCode, local, password)
+    }
+
+    override suspend fun loginWithPhone(
+        countryCode: String,
+        mobileNumber: String,
+        password: String
+    ): Result<SupabaseUser> {
+        val normalized = PhoneNormalizationUtils.normalizePhone(countryCode, mobileNumber)
+        val result = supabaseAuthService.loginWithEmail(normalized.loginEmail, password)
         return if (result.isSuccess) {
             result
         } else {
-            supabaseAuthService.loginWithEmail(phone, password)
+            // Fallback attempts for backward compatibility with previously stored formats
+            val fallback1 = supabaseAuthService.loginWithEmail(normalized.fullE164, password)
+            if (fallback1.isSuccess) {
+                fallback1
+            } else {
+                val rawDigits = mobileNumber.filter { it.isDigit() }
+                val fallback2 = supabaseAuthService.loginWithEmail("${rawDigits}@vaulta.app", password)
+                if (fallback2.isSuccess) fallback2 else result
+            }
         }
     }
 

@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.waleed.vaulta.android.BuildConfig
+import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseUser
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.repository.AuthRepository
@@ -106,6 +107,37 @@ class AuthViewModel @Inject constructor(
             _successMessage.value = null
 
             val result = authRepository.loginWithEmail(email, password)
+            _isLoading.value = false
+
+            result.onSuccess {
+                _successMessage.value = "Logged in successfully!"
+                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+            }.onFailure { error ->
+                _errorMessage.value = error.message ?: "Login failed. Please check your credentials."
+            }
+        }
+    }
+
+    /**
+     * (2b) Mobile Phone Sign-In with Country Code and Password.
+     */
+    fun signInWithPhone(countryCode: String, mobileNumber: String, password: String) {
+        val phoneError = PhoneNormalizationUtils.validatePhone(countryCode, mobileNumber)
+        if (phoneError != null) {
+            _errorMessage.value = phoneError
+            return
+        }
+        if (password.isBlank()) {
+            _errorMessage.value = "Please enter your password."
+            return
+        }
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            _successMessage.value = null
+
+            val result = authRepository.loginWithPhone(countryCode, mobileNumber, password)
             _isLoading.value = false
 
             result.onSuccess {

@@ -17,10 +17,29 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 
+data class FilterParams(
+    val query: String = "",
+    val type: String = "All",
+    val category: String = "All",
+    val dateRange: String = "All Time",
+    val customStart: Long? = null,
+    val customEnd: Long? = null
+)
+
 data class TransactionListUiState(
     val transactions: List<ExpenseEntity> = emptyList(),
-    val filterType: String = "All",
-    val dateRange: String = "All Time",
+    val allTransactions: List<ExpenseEntity> = emptyList(),
+    val searchQuery: String = "",
+    val filterType: String = "All", // "All", "Expense", "Income"
+    val selectedCategory: String = "All", // "All" or specific category
+    val availableCategories: List<String> = emptyList(),
+    val dateRange: String = "All Time", // "All Time", "Today", "This Week", "This Month", "Last Month", "Custom"
+    val customStartDateMillis: Long? = null,
+    val customEndDateMillis: Long? = null,
+    val totalIncome: Double = 0.0,
+    val totalExpense: Double = 0.0,
+    val netBalance: Double = 0.0,
+    val isFilterActive: Boolean = false,
     val isLoading: Boolean = false
 )
 
@@ -29,26 +48,82 @@ class TransactionListViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository
 ) : BaseViewModel() {
 
-    private val _filterType = MutableStateFlow("All")
-    private val _dateRange = MutableStateFlow("All Time")
+    private val _filterParams = MutableStateFlow(FilterParams())
 
     val uiState: StateFlow<TransactionListUiState> = combine(
         expenseRepository.getAllExpenses(),
-        _filterType,
-        _dateRange
-    ) { allExpenses, filter, dateRange ->
-        val filteredByType = when (filter) {
-            "Expense" -> allExpenses.filter { it.type == "Expense" }
-            "Income" -> allExpenses.filter { it.type == "Income" }
-            else -> allExpenses
+        _filterParams
+    ) { allExpenses, filters ->
+
+        // 1. Search Query Filter
+        val queryFiltered = if (filters.query.isBlank()) {
+            allExpenses
+        } else {
+            val q = filters.query.trim().lowercase()
+            allExpenses.filter { item ->
+                item.title.lowercase().contains(q) ||
+                item.type.lowercase().contains(q) ||
+                item.amount.toString().contains(q) ||
+                item.date.lowercase().contains(q)
+            }
         }
 
-        val filteredByDate = filterByDateRange(filteredByType, dateRange)
+        // 2. Type Filter (All, Income, Expense)
+        val typeFiltered = when (filters.type) {
+            "Expense" -> queryFiltered.filter { it.type.equals("Expense", ignoreCase = true) }
+            "Income" -> queryFiltered.filter { it.type.equals("Income", ignoreCase = true) }
+            else -> queryFiltered
+        }
+
+        // 3. Category Filter
+        val categoryFiltered = if (filters.category == "All") {
+            typeFiltered
+        } else {
+            typeFiltered.filter { it.title.equals(filters.category, ignoreCase = true) }
+        }
+
+        // 4. Date Range Filter
+        val dateFiltered = filterByDateRange(categoryFiltered, filters.dateRange, filters.customStart, filters.customEnd)
+
+        // Dynamic Calculations
+        var incomeSum = 0.0
+        var expenseSum = 0.0
+        dateFiltered.forEach { item ->
+            if (item.type.equals("Income", ignoreCase = true)) {
+                incomeSum += item.amount
+            } else {
+                expenseSum += item.amount
+            }
+        }
+        val net = incomeSum - expenseSum
+
+        val isFilterActive = filters.query.isNotBlank() ||
+                filters.type != "All" ||
+                filters.category != "All" ||
+                filters.dateRange != "All Time"
+
+        // Build list of distinct available categories
+        val categoriesSet = linkedSetOf("All")
+        allExpenses.forEach { categoriesSet.add(it.title) }
+        // Ensure standard presets are available
+        listOf("Salary", "Freelance", "Grocery", "Utilities", "Food", "Rent", "Healthcare", "Transport", "Shopping", "Entertainment").forEach {
+            categoriesSet.add(it)
+        }
 
         TransactionListUiState(
-            transactions = filteredByDate,
-            filterType = filter,
-            dateRange = dateRange,
+            transactions = dateFiltered,
+            allTransactions = allExpenses,
+            searchQuery = filters.query,
+            filterType = filters.type,
+            selectedCategory = filters.category,
+            availableCategories = categoriesSet.toList(),
+            dateRange = filters.dateRange,
+            customStartDateMillis = filters.customStart,
+            customEndDateMillis = filters.customEnd,
+            totalIncome = incomeSum,
+            totalExpense = expenseSum,
+            netBalance = net,
+            isFilterActive = isFilterActive,
             isLoading = false
         )
     }.stateIn(
@@ -59,11 +134,27 @@ class TransactionListViewModel @Inject constructor(
 
     override fun onEvent(event: UiEvent) {
         when (event) {
+            is TransactionListUiEvent.OnSearchQueryChanged -> {
+                _filterParams.value = _filterParams.value.copy(query = event.query)
+            }
             is TransactionListUiEvent.OnFilterTypeChanged -> {
-                _filterType.value = event.filterType
+                _filterParams.value = _filterParams.value.copy(type = event.filterType)
+            }
+            is TransactionListUiEvent.OnCategoryChanged -> {
+                _filterParams.value = _filterParams.value.copy(category = event.category)
             }
             is TransactionListUiEvent.OnDateRangeChanged -> {
-                _dateRange.value = event.dateRange
+                _filterParams.value = _filterParams.value.copy(dateRange = event.dateRange)
+            }
+            is TransactionListUiEvent.OnCustomDateRangeSelected -> {
+                _filterParams.value = _filterParams.value.copy(
+                    customStart = event.startMillis,
+                    customEnd = event.endMillis,
+                    dateRange = "Custom"
+                )
+            }
+            is TransactionListUiEvent.OnResetFilters -> {
+                _filterParams.value = FilterParams()
             }
             is TransactionListUiEvent.OnBackPressed -> {
                 viewModelScope.launch {
@@ -73,22 +164,88 @@ class TransactionListViewModel @Inject constructor(
         }
     }
 
-    private fun filterByDateRange(list: List<ExpenseEntity>, range: String): List<ExpenseEntity> {
+    private fun filterByDateRange(
+        list: List<ExpenseEntity>,
+        range: String,
+        customStart: Long?,
+        customEnd: Long?
+    ): List<ExpenseEntity> {
         if (range == "All Time") return list
 
-        val now = Calendar.getInstance()
+        val startOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val endOfToday = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        val startOfWeek = Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val startOfMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val startOfLastMonth = Calendar.getInstance().apply {
+            add(Calendar.MONTH, -1)
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val endOfLastMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            add(Calendar.MILLISECOND, -1)
+        }.timeInMillis
+
         return list.filter { item ->
             val itemMillis = Utils.getMillisFromDate(item.date)
-            val itemCal = Calendar.getInstance().apply { timeInMillis = itemMillis }
-
             when (range) {
-                "This Month" -> {
-                    itemCal.get(Calendar.MONTH) == now.get(Calendar.MONTH) &&
-                            itemCal.get(Calendar.YEAR) == now.get(Calendar.YEAR)
-                }
-                "Last 7 Days" -> {
-                    val sevenDaysAgo = System.currentTimeMillis() - (7L * 24 * 60 * 60 * 1000)
-                    itemMillis >= sevenDaysAgo
+                "Today" -> itemMillis in startOfToday..endOfToday
+                "This Week" -> itemMillis in startOfWeek..endOfToday
+                "This Month" -> itemMillis in startOfMonth..endOfToday
+                "Last Month" -> itemMillis in startOfLastMonth..endOfLastMonth
+                "Custom" -> {
+                    if (customStart != null && customEnd != null) {
+                        val s = Calendar.getInstance().apply {
+                            timeInMillis = customStart
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                        val e = Calendar.getInstance().apply {
+                            timeInMillis = customEnd
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                            set(Calendar.MILLISECOND, 999)
+                        }.timeInMillis
+                        itemMillis in s..e
+                    } else true
                 }
                 else -> true
             }
@@ -97,8 +254,11 @@ class TransactionListViewModel @Inject constructor(
 }
 
 sealed class TransactionListUiEvent : UiEvent() {
+    data class OnSearchQueryChanged(val query: String) : TransactionListUiEvent()
     data class OnFilterTypeChanged(val filterType: String) : TransactionListUiEvent()
+    data class OnCategoryChanged(val category: String) : TransactionListUiEvent()
     data class OnDateRangeChanged(val dateRange: String) : TransactionListUiEvent()
-    data object OnBackPressed : TransactionUiEvent()
+    data class OnCustomDateRangeSelected(val startMillis: Long, val endMillis: Long) : TransactionListUiEvent()
+    data object OnResetFilters : TransactionListUiEvent()
+    data object OnBackPressed : TransactionListUiEvent()
 }
-open class TransactionUiEvent : UiEvent()

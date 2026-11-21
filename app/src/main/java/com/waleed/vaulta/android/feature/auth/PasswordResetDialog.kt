@@ -70,6 +70,13 @@ fun PasswordResetDialog(
                         fontSize = 12.sp
                     )
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "💡 Check your Spam or Promotions folder if you don't see the reset email within a minute.",
+                    fontSize = 11.5.sp,
+                    color = LightGrey.copy(alpha = 0.9f),
+                    lineHeight = 16.sp
+                )
             }
         },
         confirmButton = {

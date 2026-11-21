@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.waleed.vaulta.android.base.AuthNavigationEvent
 import com.waleed.vaulta.android.base.BaseViewModel
 import com.waleed.vaulta.android.base.UiEvent
+import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +23,7 @@ enum class AuthTab {
 data class RegisterUiState(
     val username: String = "",
     val email: String = "",
+    val countryCode: String = "+91",
     val mobileNumber: String = "",
     val password: String = "",
     val confirmPassword: String = "",
@@ -51,6 +53,10 @@ class RegisterViewModel @Inject constructor(
 
             is RegisterUiEvent.OnEmailChanged -> {
                 _uiState.value = _uiState.value.copy(email = event.value, errorMessage = null)
+            }
+
+            is RegisterUiEvent.OnCountryCodeChanged -> {
+                _uiState.value = _uiState.value.copy(countryCode = event.value, errorMessage = null)
             }
 
             is RegisterUiEvent.OnMobileChanged -> {
@@ -164,9 +170,9 @@ class RegisterViewModel @Inject constructor(
                 }
             }
         } else {
-            val phone = state.mobileNumber.trim()
-            if (phone.length < 10) {
-                _uiState.value = state.copy(errorMessage = "Please enter a valid 10-digit mobile number")
+            val validationError = PhoneNormalizationUtils.validatePhone(state.countryCode, state.mobileNumber)
+            if (validationError != null) {
+                _uiState.value = state.copy(errorMessage = validationError)
                 return
             }
 
@@ -174,7 +180,8 @@ class RegisterViewModel @Inject constructor(
             viewModelScope.launch {
                 val result = authRepository.registerWithPhone(
                     username = username,
-                    phone = phone,
+                    countryCode = state.countryCode,
+                    mobileNumber = state.mobileNumber,
                     password = password
                 )
                 _uiState.value = _uiState.value.copy(isLoading = false)
@@ -193,6 +200,7 @@ class RegisterViewModel @Inject constructor(
 sealed class RegisterUiEvent : UiEvent() {
     data class OnUsernameChanged(val value: String) : RegisterUiEvent()
     data class OnEmailChanged(val value: String) : RegisterUiEvent()
+    data class OnCountryCodeChanged(val value: String) : RegisterUiEvent()
     data class OnMobileChanged(val value: String) : RegisterUiEvent()
     data class OnPasswordChanged(val value: String) : RegisterUiEvent()
     data class OnConfirmPasswordChanged(val value: String) : RegisterUiEvent()

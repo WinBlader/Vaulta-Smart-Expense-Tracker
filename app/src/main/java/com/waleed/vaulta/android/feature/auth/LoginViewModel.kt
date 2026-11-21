@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.waleed.vaulta.android.base.AuthNavigationEvent
 import com.waleed.vaulta.android.base.BaseViewModel
 import com.waleed.vaulta.android.base.UiEvent
+import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,8 +15,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LoginUiState(
-    val identifier: String = "", // Email or Mobile Number
+    val email: String = "",
+    val countryCode: String = "+91",
+    val mobileNumber: String = "",
+    val identifier: String = "", // Legacy fallback
     val password: String = "",
+    val authTab: AuthTab = AuthTab.EMAIL,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val showGoogleChooser: Boolean = false,
@@ -34,6 +39,22 @@ class LoginViewModel @Inject constructor(
 
     override fun onEvent(event: UiEvent) {
         when (event) {
+            is LoginUiEvent.OnEmailChanged -> {
+                _uiState.value = _uiState.value.copy(email = event.value, errorMessage = null)
+            }
+
+            is LoginUiEvent.OnCountryCodeChanged -> {
+                _uiState.value = _uiState.value.copy(countryCode = event.value, errorMessage = null)
+            }
+
+            is LoginUiEvent.OnMobileChanged -> {
+                _uiState.value = _uiState.value.copy(mobileNumber = event.value, errorMessage = null)
+            }
+
+            is LoginUiEvent.OnTabSelected -> {
+                _uiState.value = _uiState.value.copy(authTab = event.tab, errorMessage = null)
+            }
+
             is LoginUiEvent.OnIdentifierChanged -> {
                 _uiState.value = _uiState.value.copy(identifier = event.value, errorMessage = null)
             }
@@ -93,44 +114,60 @@ class LoginViewModel @Inject constructor(
 
     private fun performSupabaseLogin() {
         val state = _uiState.value
-        val input = state.identifier.trim()
         val password = state.password
-
-        if (input.isEmpty()) {
-            _uiState.value = state.copy(errorMessage = "Please enter your Email or Mobile number")
-            return
-        }
 
         if (password.isEmpty()) {
             _uiState.value = state.copy(errorMessage = "Please enter your password")
             return
         }
 
-        _uiState.value = state.copy(isLoading = true, errorMessage = null)
-
-        val isPhone = input.all { it.isDigit() || it == '+' } && input.filter { it.isDigit() }.length >= 10
-
-        viewModelScope.launch {
-            val result = if (isPhone) {
-                authRepository.loginWithPhone(input, password)
-            } else {
-                authRepository.loginWithEmail(input, password)
+        if (state.authTab == AuthTab.PHONE) {
+            val phoneError = PhoneNormalizationUtils.validatePhone(state.countryCode, state.mobileNumber)
+            if (phoneError != null) {
+                _uiState.value = state.copy(errorMessage = phoneError)
+                return
             }
 
-            _uiState.value = _uiState.value.copy(isLoading = false)
+            _uiState.value = state.copy(isLoading = true, errorMessage = null)
+            viewModelScope.launch {
+                val result = authRepository.loginWithPhone(state.countryCode, state.mobileNumber, password)
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                result.onSuccess {
+                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                }.onFailure { err ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = err.message ?: "Login failed. Check your credentials."
+                    )
+                }
+            }
+        } else {
+            val email = if (state.email.isNotBlank()) state.email.trim() else state.identifier.trim()
+            if (email.isEmpty()) {
+                _uiState.value = state.copy(errorMessage = "Please enter your email address")
+                return
+            }
 
-            result.onSuccess {
-                _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
-            }.onFailure { err ->
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = err.message ?: "Login failed. Check your credentials."
-                )
+            _uiState.value = state.copy(isLoading = true, errorMessage = null)
+            viewModelScope.launch {
+                val result = authRepository.loginWithEmail(email, password)
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                result.onSuccess {
+                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                }.onFailure { err ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = err.message ?: "Login failed. Check your credentials."
+                    )
+                }
             }
         }
     }
 }
 
 sealed class LoginUiEvent : UiEvent() {
+    data class OnEmailChanged(val value: String) : LoginUiEvent()
+    data class OnCountryCodeChanged(val value: String) : LoginUiEvent()
+    data class OnMobileChanged(val value: String) : LoginUiEvent()
+    data class OnTabSelected(val tab: AuthTab) : LoginUiEvent()
     data class OnIdentifierChanged(val value: String) : LoginUiEvent()
     data class OnPasswordChanged(val value: String) : LoginUiEvent()
     data object OnLoginClicked : LoginUiEvent()

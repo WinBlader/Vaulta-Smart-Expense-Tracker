@@ -61,6 +61,7 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.waleed.vaulta.android.R
+import com.waleed.vaulta.android.data.auth.PhoneNormalizationUtils
 import com.waleed.vaulta.android.ui.theme.InterFontFamily
 import com.waleed.vaulta.android.ui.theme.LightGrey
 import com.waleed.vaulta.android.ui.theme.Red
@@ -77,8 +78,13 @@ fun LoginScreen(
     val errorMessage by authViewModel.errorMessage.collectAsState()
     val successMessage by authViewModel.successMessage.collectAsState()
 
+    var authTab by remember { mutableStateOf(AuthTab.EMAIL) }
+    var email by remember { mutableStateOf("") }
+    var countryCode by remember { mutableStateOf("+91") }
+    var mobileNumber by remember { mutableStateOf("") }
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var localValidationError by remember { mutableStateOf<String?>(null) }
     var showPasswordReset by remember { mutableStateOf(false) }
     var showGoogleChooserDialog by remember { mutableStateOf(false) }
 
@@ -196,18 +202,63 @@ fun LoginScreen(
                         end.linkTo(parent.end)
                     }
             ) {
-                ExpenseTextView(
-                    text = "SIGN IN",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = LightGrey,
-                    letterSpacing = 1.sp
-                )
+                // Tab Selector: Email vs Mobile
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (authTab == AuthTab.EMAIL) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .clickable {
+                                authTab = AuthTab.EMAIL
+                                localValidationError = null
+                                authViewModel.clearMessages()
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Email Login",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = if (authTab == AuthTab.EMAIL) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (authTab == AuthTab.PHONE) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .clickable {
+                                authTab = AuthTab.PHONE
+                                localValidationError = null
+                                authViewModel.clearMessages()
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Mobile Login",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = if (authTab == AuthTab.PHONE) Color.White else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Error Banner with clear messaging
-                AnimatedVisibility(visible = errorMessage != null) {
-                    errorMessage?.let { error ->
+                val displayError = localValidationError ?: errorMessage
+                AnimatedVisibility(visible = displayError != null) {
+                    displayError?.let { error ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -238,38 +289,113 @@ fun LoginScreen(
                     }
                 }
 
-                // Field 1: Email or Mobile
-                ExpenseTextView(
-                    text = "EMAIL OR MOBILE NUMBER",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = LightGrey,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = identifier,
-                    onValueChange = {
-                        identifier = it
-                        authViewModel.clearMessages()
-                    },
-                    placeholder = { ExpenseTextView(text = "name@example.com or mobile", color = LightGrey) },
-                    leadingIcon = {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_person),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true,
-                    textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = InterFontFamily),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                if (authTab == AuthTab.EMAIL) {
+                    // Field: Email Address
+                    ExpenseTextView(
+                        text = "EMAIL ADDRESS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LightGrey,
+                        letterSpacing = 1.sp
                     )
-                )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = {
+                            email = it
+                            localValidationError = null
+                            authViewModel.clearMessages()
+                        },
+                        placeholder = { ExpenseTextView(text = "name@example.com", color = LightGrey) },
+                        leadingIcon = {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_mail),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontFamily = InterFontFamily),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                } else {
+                    // Field: Mobile with Side-by-side Country Code & Mobile Number
+                    ExpenseTextView(
+                        text = "MOBILE NUMBER",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LightGrey,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Country Code
+                        OutlinedTextField(
+                            value = countryCode,
+                            onValueChange = { input ->
+                                countryCode = PhoneNormalizationUtils.sanitizeCountryCodeInput(input)
+                                localValidationError = null
+                                authViewModel.clearMessages()
+                            },
+                            placeholder = { Text("+91", color = LightGrey, fontSize = 14.sp) },
+                            modifier = Modifier.width(84.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = InterFontFamily,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+
+                        // Mobile Number
+                        OutlinedTextField(
+                            value = mobileNumber,
+                            onValueChange = { input ->
+                                mobileNumber = input.filter { it.isDigit() }.take(14)
+                                localValidationError = null
+                                authViewModel.clearMessages()
+                            },
+                            placeholder = { ExpenseTextView(text = "9876543210", color = LightGrey) },
+                            leadingIcon = {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_phone),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            textStyle = TextStyle(
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontFamily = InterFontFamily,
+                                fontSize = 14.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -299,6 +425,7 @@ fun LoginScreen(
                     value = password,
                     onValueChange = {
                         password = it
+                        localValidationError = null
                         authViewModel.clearMessages()
                     },
                     placeholder = { ExpenseTextView(text = "Enter your password", color = LightGrey) },
@@ -326,7 +453,29 @@ fun LoginScreen(
                 // Login Button
                 Button(
                     onClick = {
-                        authViewModel.signInWithEmail(identifier.trim(), password)
+                        if (authTab == AuthTab.EMAIL) {
+                            val trimmed = email.trim()
+                            if (trimmed.isEmpty()) {
+                                localValidationError = "Please enter your email address."
+                                return@Button
+                            }
+                            if (password.isEmpty()) {
+                                localValidationError = "Please enter your password."
+                                return@Button
+                            }
+                            authViewModel.signInWithEmail(trimmed, password)
+                        } else {
+                            val phoneError = PhoneNormalizationUtils.validatePhone(countryCode, mobileNumber)
+                            if (phoneError != null) {
+                                localValidationError = phoneError
+                                return@Button
+                            }
+                            if (password.isEmpty()) {
+                                localValidationError = "Please enter your password."
+                                return@Button
+                            }
+                            authViewModel.signInWithPhone(countryCode, mobileNumber, password)
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()

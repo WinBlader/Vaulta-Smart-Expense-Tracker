@@ -1,7 +1,7 @@
-
 # Gradle files
 .gradle/
 build/
+app/build/
 
 # Local configuration file (sdk path, etc)
 local.properties
@@ -14,7 +14,13 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.apk
+*.aab
+*.apks
+*.jar
+bundletool*
 output.json
+app/release/
+release/
 
 # IntelliJ
 *.iml
@@ -36,4 +42,3 @@ google-services.json
 .gradle_home/
 
 .kotlin/
-
