@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.waleed.vaulta.android.feature.home
 
 import androidx.compose.animation.AnimatedVisibility
@@ -19,18 +21,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +58,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.feature.budget.SetBudgetDialog
+import com.waleed.vaulta.android.feature.transactionlist.TransactionReceiptDialog
 import com.waleed.vaulta.android.ui.theme.Zinc
 import com.waleed.vaulta.android.utils.NavRouts
 import com.waleed.vaulta.android.widget.ExpenseTextView
@@ -98,6 +107,16 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     val currentCurrency by com.waleed.vaulta.android.data.CurrencyManager.selectedCurrency.collectAsState()
     val greetingName = userState?.name?.ifEmpty { "User" } ?: "User"
     var showFeedbackDialog by remember { mutableStateOf(false) }
+    var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+
+    // Receipt Detail & Share Dialog
+    selectedItemForReceipt?.let { item ->
+        TransactionReceiptDialog(
+            item = item,
+            onDelete = { viewModel.deleteExpense(it) },
+            onDismiss = { selectedItemForReceipt = null }
+        )
+    }
 
     if (showFeedbackDialog) {
         FeedbackSupportDialog(onDismiss = { showFeedbackDialog = false })
@@ -237,6 +256,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 monthlyBudget = monthlyBudget,
                 onSetBudgetClicked = { showBudgetDialog = true },
                 onSpendsDashboardClicked = { viewModel.onEvent(HomeUiEvent.OnSpendsDashboardClicked) },
+                onItemClicked = { selectedItemForReceipt = it },
+                onDeleteClicked = { viewModel.deleteExpense(it) },
                 onSeeAllClicked = {
                     viewModel.onEvent(HomeUiEvent.OnSeeAllClicked)
                 }
@@ -398,6 +419,8 @@ fun TransactionList(
     monthlyBudget: Double = 0.0,
     onSetBudgetClicked: (() -> Unit)? = null,
     onSpendsDashboardClicked: (() -> Unit)? = null,
+    onItemClicked: ((ExpenseEntity) -> Unit)? = null,
+    onDeleteClicked: ((ExpenseEntity) -> Unit)? = null,
     onSeeAllClicked: () -> Unit
 ) {
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
@@ -537,17 +560,63 @@ fun TransactionList(
         }
         items(
             items = list,
-            key = { item -> item.id ?: 0 }) { item ->
-            val icon = Utils.getItemIcon(item)
-            val amount = if (item.type == "Income") item.amount else item.amount * -1
+            key = { item -> item.id ?: 0 }
+        ) { item ->
+            val currentItem by rememberUpdatedState(item)
+            val dismissState = rememberSwipeToDismissBoxState(
+                confirmValueChange = { dismissValue ->
+                    if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
+                        onDeleteClicked?.invoke(currentItem)
+                        true
+                    } else false
+                }
+            )
 
-            TransactionItem(
-                title = item.title,
-                amount = Utils.formatCurrency(amount, currentCurrency),
-                icon = icon,
-                date = Utils.formatStringDateToMonthDayYear(item.date),
-                color = if (item.type == "Income") Green else Red,
-                Modifier
+            SwipeToDismissBox(
+                state = dismissState,
+                backgroundContent = {
+                    val alignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Red)
+                            .padding(horizontal = 20.dp),
+                        contentAlignment = alignment
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_delete),
+                            contentDescription = "Delete",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                },
+                content = {
+                    Surface(
+                        color = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val icon = Utils.getItemIcon(item)
+                        val amount = if (item.type == "Income") item.amount else item.amount * -1
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onItemClicked?.invoke(item) }
+                        ) {
+                            TransactionItem(
+                                title = item.title,
+                                amount = Utils.formatCurrency(amount, currentCurrency),
+                                icon = icon,
+                                date = Utils.formatStringDateToMonthDayYear(item.date),
+                                color = if (item.type == "Income") Green else Red,
+                                modifier = Modifier
+                            )
+                        }
+                    }
+                }
             )
         }
     }

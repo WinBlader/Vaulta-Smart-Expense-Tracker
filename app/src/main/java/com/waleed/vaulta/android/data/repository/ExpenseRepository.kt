@@ -106,6 +106,8 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)
+            budgetManager.checkBudgetAndNotify(emptyList())
+            budgetManager.checkBalanceAndNotify(emptyList())
         } catch (_: Exception) {}
     }
 }

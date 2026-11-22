@@ -232,7 +232,59 @@ fun ProfileScreen(
         )
     }
 
-    
+    if (uiState.showResetEverythingDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ProfileUiEvent.OnDismissResetEverything) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_delete),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = ColorFilter.tint(Red)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ExpenseTextView(
+                        text = "Reset Everything?",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Red
+                    )
+                }
+            },
+            text = {
+                Column {
+                    ExpenseTextView(
+                        text = "This will permanently erase all your transactions, reset your monthly budget to 0.0, and clear auto-detect settings.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ExpenseTextView(
+                        text = "⚠️ This action cannot be undone. Are you absolutely sure you want to proceed?",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Red
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnConfirmResetEverything) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    ExpenseTextView(text = "Erase & Reset Everything", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissResetEverything) }) {
+                    ExpenseTextView(text = "Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
     if (showCurrencyDialog) {
         CurrencySelectionDialog(
             currentCurrency = currentCurrency,
@@ -810,6 +862,63 @@ fun ProfileScreen(
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.sp
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // DATA & PRIVACY DANGER ZONE CARD
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        ExpenseTextView(
+                            text = "DATA & PRIVACY",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = LightGrey,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        ExpenseTextView(
+                            text = "Reset all stored transactions, budgets, and configurations.",
+                            fontSize = 12.sp,
+                            color = LightGrey
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.onEvent(ProfileUiEvent.OnRequestResetEverything) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Red),
+                            border = BorderStroke(1.dp, Red.copy(alpha = 0.7f))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_delete),
+                                    contentDescription = "Reset Everything",
+                                    modifier = Modifier.size(18.dp),
+                                    colorFilter = ColorFilter.tint(Red)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                ExpenseTextView(
+                                    text = "Reset Everything",
+                                    color = Red,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
                     }
                 }
 

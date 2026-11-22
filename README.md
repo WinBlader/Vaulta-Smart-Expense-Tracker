@@ -83,6 +83,12 @@
 - **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
 - **Deduplication Engine:** 2-minute rolling time window prevents double-logging when Bank SMS and UPI push notifications trigger simultaneously.
 
+### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
+- **Swipe-to-Delete:** Effortlessly dismiss any transaction from the Home feed or the full Transaction List using Material 3 `SwipeToDismissBox` with custom red warning backgrounds and trash icons.
+- **Item Detail Removal:** Direct **Delete Transaction** action button inside the itemized receipt view with safety confirmation.
+- **Instant Undo:** Vaulta-branded snackbar with a 4.5-second **UNDO** button to instantly restore accidentally deleted entries.
+- **In-App "Reset Everything":** Double-confirmed safety reset option in the Profile screen under *Data & Privacy* to permanently wipe local transactions, reset budgets to zero, and clear auto-detect preferences for the active user account.
+
 ---
 
 ## 📸 Visual App Showcase

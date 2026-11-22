@@ -156,6 +156,23 @@ class TransactionListViewModel @Inject constructor(
             is TransactionListUiEvent.OnResetFilters -> {
                 _filterParams.value = FilterParams()
             }
+            is TransactionListUiEvent.OnDeleteTransaction -> {
+                viewModelScope.launch {
+                    val success = expenseRepository.deleteExpense(event.expense)
+                    if (success) {
+                        com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                            message = "Transaction deleted",
+                            actionLabel = "UNDO",
+                            onAction = {
+                                viewModelScope.launch {
+                                    expenseRepository.insertExpense(event.expense)
+                                }
+                            },
+                            durationMs = 4500L
+                        )
+                    }
+                }
+            }
             is TransactionListUiEvent.OnBackPressed -> {
                 viewModelScope.launch {
                     _navigationEvent.emit(NavigationEvent.NavigateBack)
@@ -260,5 +277,6 @@ sealed class TransactionListUiEvent : UiEvent() {
     data class OnDateRangeChanged(val dateRange: String) : TransactionListUiEvent()
     data class OnCustomDateRangeSelected(val startMillis: Long, val endMillis: Long) : TransactionListUiEvent()
     data object OnResetFilters : TransactionListUiEvent()
+    data class OnDeleteTransaction(val expense: ExpenseEntity) : TransactionListUiEvent()
     data object OnBackPressed : TransactionListUiEvent()
 }

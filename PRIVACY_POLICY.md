@@ -53,8 +53,10 @@ We do **not** use third-party advertising SDKs, and we do **not** sell, rent, or
 
 ## 4. Data Retention & Deletion
 You maintain complete ownership of your data:
-- **Local Data Deletion:** You can erase all locally stored data at any time by clearing the application's storage in your Android device's Settings (`Settings > Apps > Vaulta > Storage > Clear Data`) or by uninstalling the application.
-- **Account & Cloud Data Deletion:** To request the permanent deletion of your cloud account and associated data from our servers, send an email to **winblader.org@gmail.com** with the subject *"Account Deletion Request"*. Your account and data will be permanently removed within 30 days.
+- **Individual Transaction Deletion:** You can delete any individual expense or income entry at any time via Swipe-to-Delete on the Home or Transaction List screens, or via the Delete button inside the Transaction Receipt dialog. A brief "Undo" action allows instant recovery if dismissed by mistake.
+- **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`.
+- **Operating System Deletion:** You can erase all locally stored data at any time by clearing the application's storage in your Android device's Settings (`Settings > Apps > Vaulta > Storage > Clear Data`) or by uninstalling the application.
+- **Account & Cloud Data Deletion:** To request the permanent deletion of your cloud account and associated profile data from our servers, send an email to **winblader.org@gmail.com** with the subject *"Account Deletion Request"*. Your account and data will be permanently removed within 30 days.
 
 ---
 

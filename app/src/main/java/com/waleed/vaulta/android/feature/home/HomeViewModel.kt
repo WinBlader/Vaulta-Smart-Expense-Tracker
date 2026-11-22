@@ -44,6 +44,24 @@ class HomeViewModel @Inject constructor(
         budgetRepository.checkBalanceAndNotify(list)
     }
 
+    fun deleteExpense(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            val success = expenseRepository.deleteExpense(expense)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Transaction deleted",
+                    actionLabel = "UNDO",
+                    onAction = {
+                        viewModelScope.launch {
+                            expenseRepository.insertExpense(expense)
+                        }
+                    },
+                    durationMs = 4500L
+                )
+            }
+        }
+    }
+
     override fun onEvent(event: UiEvent) {
         when (event) {
             is HomeUiEvent.OnAddExpenseClicked -> {

@@ -10,6 +10,7 @@ import com.waleed.vaulta.android.data.model.CurrencyItem
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.notification.NotificationAccessHelper
 import com.waleed.vaulta.android.data.repository.AuthRepository
+import com.waleed.vaulta.android.data.repository.BudgetRepository
 import com.waleed.vaulta.android.data.repository.ExpenseRepository
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +30,7 @@ data class ProfileUiState(
     val editPhone: String = "",
     val showLogoutConfirm: Boolean = false,
     val showAutoDetectDisclosureDialog: Boolean = false,
+    val showResetEverythingDialog: Boolean = false,
     val message: String? = null
 )
 
@@ -36,6 +38,7 @@ data class ProfileUiState(
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val expenseRepository: ExpenseRepository,
+    private val budgetRepository: BudgetRepository,
     private val sessionManager: UserSessionManager,
     @ApplicationContext private val context: Context
 ) : BaseViewModel() {
@@ -238,6 +241,37 @@ class ProfileViewModel @Inject constructor(
                     _navigationEvent.emit(ProfileNavigationEvent.NavigateToLogin)
                 }
             }
+
+            is ProfileUiEvent.OnRequestResetEverything -> {
+                _uiState.value = _uiState.value.copy(showResetEverythingDialog = true)
+            }
+
+            is ProfileUiEvent.OnDismissResetEverything -> {
+                _uiState.value = _uiState.value.copy(showResetEverythingDialog = false)
+            }
+
+            is ProfileUiEvent.OnConfirmResetEverything -> {
+                _uiState.value = _uiState.value.copy(showResetEverythingDialog = false)
+                viewModelScope.launch {
+                    try {
+                        expenseRepository.clearCurrentUserData()
+                        budgetRepository.setMonthlyBudget(0.0, emptyList())
+                        val userKey = sessionManager.getCurrentUserKey()
+                        NotificationAccessHelper.resetAutoDetect(context, userKey)
+                        _isAutoDetectEnabled.value = false
+                        com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                            message = "All data has been reset",
+                            durationMs = 3500L
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProfileViewModel", "Reset everything error", e)
+                        com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                            message = "Reset failed: ${e.message}",
+                            durationMs = 3500L
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -261,4 +295,7 @@ sealed class ProfileUiEvent : UiEvent() {
     data object OnLogoutClicked : ProfileUiEvent()
     data object OnDismissLogout : ProfileUiEvent()
     data object OnConfirmLogout : ProfileUiEvent()
+    data object OnRequestResetEverything : ProfileUiEvent()
+    data object OnDismissResetEverything : ProfileUiEvent()
+    data object OnConfirmResetEverything : ProfileUiEvent()
 }

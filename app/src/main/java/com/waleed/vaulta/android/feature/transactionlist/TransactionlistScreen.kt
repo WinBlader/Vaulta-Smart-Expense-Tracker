@@ -2,6 +2,11 @@
 
 package com.waleed.vaulta.android.feature.transactionlist
 
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.Icon
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -106,6 +111,7 @@ fun TransactionListScreen(
     selectedItemForReceipt?.let { item ->
         TransactionReceiptDialog(
             item = item,
+            onDelete = { viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(it)) },
             onDismiss = { selectedItemForReceipt = null }
         )
     }
@@ -619,25 +625,64 @@ fun TransactionListScreen(
                         items = uiState.transactions,
                         key = { it.id ?: 0 }
                     ) { item ->
-                        val icon = Utils.getItemIcon(item)
-                        val formattedAmount = Utils.formatCurrency(item.amount, currentCurrency)
+                        val currentItem by rememberUpdatedState(item)
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { dismissValue ->
+                                if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
+                                    viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(currentItem))
+                                    true
+                                } else false
+                            }
+                        )
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedItemForReceipt = item
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            backgroundContent = {
+                                val alignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(vertical = 4.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Red)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = alignment
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_delete),
+                                        contentDescription = "Delete",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
                                 }
-                        ) {
-                            TransactionItem(
-                                title = item.title,
-                                amount = if (item.type.equals("Income", ignoreCase = true)) "+$formattedAmount" else "-$formattedAmount",
-                                icon = icon,
-                                date = Utils.formatStringDateToMonthDayYear(item.date),
-                                color = if (item.type.equals("Income", ignoreCase = true)) Green else Red,
-                                modifier = Modifier
-                            )
-                        }
+                            },
+                            content = {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.background,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    val icon = Utils.getItemIcon(item)
+                                    val formattedAmount = Utils.formatCurrency(item.amount, currentCurrency)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedItemForReceipt = item
+                                            }
+                                    ) {
+                                        TransactionItem(
+                                            title = item.title,
+                                            amount = if (item.type.equals("Income", ignoreCase = true)) "+$formattedAmount" else "-$formattedAmount",
+                                            icon = icon,
+                                            date = Utils.formatStringDateToMonthDayYear(item.date),
+                                            color = if (item.type.equals("Income", ignoreCase = true)) Green else Red,
+                                            modifier = Modifier
+                                        )
+                                    }
+                                }
+                            }
+                        )
                     }
 
                     item {

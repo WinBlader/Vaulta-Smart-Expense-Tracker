@@ -1,5 +1,14 @@
 package com.waleed.vaulta.android.feature.transactionlist
 
+import com.waleed.vaulta.android.R
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -42,12 +51,61 @@ import com.waleed.vaulta.android.widget.ExpenseTextView
 @Composable
 fun TransactionReceiptDialog(
     item: ExpenseEntity,
+    onDelete: ((ExpenseEntity) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val isIncome = item.type.equals("Income", ignoreCase = true)
     val amountSign = if (isIncome) "+" else "-"
     val amountColor = if (isIncome) Green else Red
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_delete),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        colorFilter = ColorFilter.tint(Red)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Delete Transaction?",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete \"${item.title}\" (${Utils.formatCurrency(item.amount)})? You can undo this action immediately after.",
+                    fontSize = 14.sp,
+                    color = LightGrey
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onDelete?.invoke(item)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -172,6 +230,31 @@ fun TransactionReceiptDialog(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Share PNG Image", fontSize = 12.5.sp)
+                }
+
+                // Delete Transaction Button
+                if (onDelete != null) {
+                    OutlinedButton(
+                        onClick = { showDeleteConfirmation = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Red),
+                        border = BorderStroke(1.dp, Red.copy(alpha = 0.6f))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_delete),
+                                contentDescription = "Delete",
+                                modifier = Modifier.size(16.dp),
+                                colorFilter = ColorFilter.tint(Red)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Delete Transaction", fontSize = 12.5.sp, color = Red, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
         },
