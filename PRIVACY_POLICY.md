@@ -21,10 +21,18 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 - **Budget Settings:** Monthly budget caps and spending limits.
 - **Storage:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend (Supabase) so you can access it across devices.
 
-### C. Device Permissions
-- **Notifications (`POST_NOTIFICATIONS`):** Used solely to alert you when your spending exceeds set budget limits or when your account balance falls below zero. We do not use notifications for marketing.
+### C. Device Permissions & Services
+- **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.
+- **Notification Access Service (`NotificationListenerService`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature.
 - **Vibration (`VIBRATE`):** Used to provide haptic feedback during alerts and reminders.
-- **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with Supabase authentication and Google Sign-In services.
+- **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with Supabase authentication and cloud sync services.
+
+### D. Optional On-Device Transaction Auto-Detection
+When you explicitly enable **Auto-Detect Transactions** in your Profile settings and grant Android Notification Access:
+- **100% Local On-Device Processing:** Vaulta parses payment alerts from supported banking SMS, cards, and payment apps (e.g., Google Pay, PhonePe, Paytm, Revolut, Wise, PayPal, Monzo, etc.) entirely locally within your device's memory.
+- **Zero Raw Text Uploads:** Raw notification contents, sender details, and message bodies are **never saved, cached, or transmitted** to any cloud server or external third party.
+- **Strict Data Filtering:** Non-transaction notifications—including One-Time Passwords (OTPs), authentication codes, personal messaging chats, promotional alerts, and ending account balances—are strictly discarded and never logged.
+- **User Control & Revocation:** Auto-Detect is disabled by default. You can turn it off at any time directly in the Vaulta Profile screen or revoke Notification Access in your device's Android System Settings.
 
 ---
 

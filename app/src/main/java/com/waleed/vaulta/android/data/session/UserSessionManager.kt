@@ -132,6 +132,8 @@ class UserSessionManager @Inject constructor(
     }
 
     fun logout() {
+        val userKey = getCurrentUserKey()
+        com.waleed.vaulta.android.data.notification.NotificationAccessHelper.resetAutoDetect(context, userKey)
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)
             .remove(KEY_USER_ID)

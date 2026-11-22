@@ -1,5 +1,6 @@
 package com.waleed.vaulta.android.feature.profile
 
+import android.content.Context
 import androidx.lifecycle.viewModelScope
 import com.waleed.vaulta.android.base.BaseViewModel
 import com.waleed.vaulta.android.base.ProfileNavigationEvent
@@ -7,9 +8,12 @@ import com.waleed.vaulta.android.base.UiEvent
 import com.waleed.vaulta.android.data.CurrencyManager
 import com.waleed.vaulta.android.data.model.CurrencyItem
 import com.waleed.vaulta.android.data.model.UserProfile
+import com.waleed.vaulta.android.data.notification.NotificationAccessHelper
 import com.waleed.vaulta.android.data.repository.AuthRepository
 import com.waleed.vaulta.android.data.repository.ExpenseRepository
+import com.waleed.vaulta.android.data.session.UserSessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,13 +28,16 @@ data class ProfileUiState(
     val editEmail: String = "",
     val editPhone: String = "",
     val showLogoutConfirm: Boolean = false,
+    val showAutoDetectDisclosureDialog: Boolean = false,
     val message: String? = null
 )
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val sessionManager: UserSessionManager,
+    @ApplicationContext private val context: Context
 ) : BaseViewModel() {
 
     val user: StateFlow<UserProfile?> = authRepository.currentUser
@@ -46,12 +53,99 @@ class ProfileViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
+    private var pendingAutoDetectEnable = false
+
+    private val _isNotificationAccessGranted = MutableStateFlow(
+        NotificationAccessHelper.isNotificationListenerEnabled(context)
+    )
+    val isNotificationAccessGranted: StateFlow<Boolean> = _isNotificationAccessGranted.asStateFlow()
+
+    private val _isAutoDetectEnabled = MutableStateFlow(
+        NotificationAccessHelper.isNotificationListenerEnabled(context) &&
+                NotificationAccessHelper.isAutoDetectEnabled(context, sessionManager.getCurrentUserKey())
+    )
+    val isAutoDetectEnabled: StateFlow<Boolean> = _isAutoDetectEnabled.asStateFlow()
+
+    private val _isIgnoringBatteryOptimizations = MutableStateFlow(
+        NotificationAccessHelper.isIgnoringBatteryOptimizations(context)
+    )
+    val isIgnoringBatteryOptimizations: StateFlow<Boolean> = _isIgnoringBatteryOptimizations.asStateFlow()
+
+    init {
+        refreshNotificationAccess()
+    }
+
+    fun refreshNotificationAccess() {
+        val userKey = sessionManager.getCurrentUserKey()
+        val granted = NotificationAccessHelper.isNotificationListenerEnabled(context)
+        _isNotificationAccessGranted.value = granted
+        _isIgnoringBatteryOptimizations.value = NotificationAccessHelper.isIgnoringBatteryOptimizations(context)
+
+        if (granted) {
+            // If user granted permission in settings and returned (or had it previously enabled)
+            if (pendingAutoDetectEnable || NotificationAccessHelper.isAutoDetectEnabled(context, userKey)) {
+                NotificationAccessHelper.setAutoDetectEnabled(context, true, userKey)
+                _isAutoDetectEnabled.value = true
+                pendingAutoDetectEnable = false
+            }
+        } else {
+            // Permission was revoked or not yet granted
+            NotificationAccessHelper.setAutoDetectEnabled(context, false, userKey)
+            _isAutoDetectEnabled.value = false
+        }
+    }
+
     fun onCurrencySelected(currency: CurrencyItem) {
         CurrencyManager.setCurrency(currency)
     }
 
     override fun onEvent(event: UiEvent) {
         when (event) {
+            is ProfileUiEvent.OnResume -> {
+                refreshNotificationAccess()
+            }
+
+            is ProfileUiEvent.OnToggleAutoDetect -> {
+                val userKey = sessionManager.getCurrentUserKey()
+                if (event.enabled) {
+                    val hasAccess = NotificationAccessHelper.isNotificationListenerEnabled(context)
+                    if (!hasAccess) {
+                        pendingAutoDetectEnable = true
+                        _uiState.value = _uiState.value.copy(showAutoDetectDisclosureDialog = true)
+                    } else {
+                        NotificationAccessHelper.setAutoDetectEnabled(context, true, userKey)
+                        _isAutoDetectEnabled.value = true
+                    }
+                } else {
+                    pendingAutoDetectEnable = false
+                    NotificationAccessHelper.setAutoDetectEnabled(context, false, userKey)
+                    _isAutoDetectEnabled.value = false
+                }
+            }
+
+            is ProfileUiEvent.OnDismissAutoDetectDisclosure -> {
+                pendingAutoDetectEnable = false
+                _uiState.value = _uiState.value.copy(showAutoDetectDisclosureDialog = false)
+            }
+
+            is ProfileUiEvent.OnOpenNotificationSettings -> {
+                _uiState.value = _uiState.value.copy(showAutoDetectDisclosureDialog = false)
+                try {
+                    context.startActivity(NotificationAccessHelper.getNotificationListenerSettingsIntent())
+                } catch (_: Exception) {
+                    // Fallback to app details settings if listener settings intent fails
+                    try {
+                        context.startActivity(NotificationAccessHelper.getAppDetailsSettingsIntent(context))
+                    } catch (_: Exception) {}
+                }
+            }
+
+            is ProfileUiEvent.OnOpenAppSettings -> {
+                try {
+                    context.startActivity(NotificationAccessHelper.getAppDetailsSettingsIntent(context))
+                } catch (_: Exception) {}
+            }
+
             is ProfileUiEvent.OnStartEdit -> {
                 val currentUser = user.value
                 _uiState.value = _uiState.value.copy(
@@ -149,6 +243,11 @@ class ProfileViewModel @Inject constructor(
 }
 
 sealed class ProfileUiEvent : UiEvent() {
+    data object OnResume : ProfileUiEvent()
+    data class OnToggleAutoDetect(val enabled: Boolean) : ProfileUiEvent()
+    data object OnDismissAutoDetectDisclosure : ProfileUiEvent()
+    data object OnOpenNotificationSettings : ProfileUiEvent()
+    data object OnOpenAppSettings : ProfileUiEvent()
     data object OnStartEdit : ProfileUiEvent()
     data class OnNameChanged(val value: String) : ProfileUiEvent()
     data class OnEmailChanged(val value: String) : ProfileUiEvent()

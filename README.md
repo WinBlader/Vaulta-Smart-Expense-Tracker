@@ -75,6 +75,14 @@
 - **Strict Multi-Account Isolation:** Database queries partition transactions strictly by user ID (`WHERE userId = :userId`), and signing out automatically purges local cached records so accounts on the same device never leak or mix data.
 - **Cloud Backend Sync:** Authenticated profiles and transaction data synchronize securely with PostgreSQL on Supabase protected by Row Level Security (RLS).
 
+### 6. ⚡ Smart Auto-Detect Transactions (Privacy-First On-Device)
+- **Automatic Payment Logging:** Optional, strictly opt-in feature using Android's `NotificationListenerService` to automatically record income and expenses from bank alerts, credit/debit cards, and digital wallets.
+- **Comprehensive Source Compatibility:** Compatible with Indian UPI & digital wallets (Google Pay, PhonePe, Paytm, BHIM, Amazon Pay) and international payment platforms (Revolut, Wise, Monzo, PayPal, Venmo, Cash App, Zelle, Starling, Apple Wallet, Google Wallet).
+- **Multi-Currency Parser:** Extracts amounts in global formats and currencies (`₹`, `Rs.`, `$`, `USD`, `€`, `EUR`, `£`, `GBP`, `AED`, `SAR`, etc.) including European comma formats (`€19,99`).
+- **100% Local & Private:** Evaluated strictly on-device in memory. Raw notification text is **never saved, logged, or uploaded** to the cloud.
+- **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
+- **Deduplication Engine:** 2-minute rolling time window prevents double-logging when Bank SMS and UPI push notifications trigger simultaneously.
+
 ---
 
 ## 📸 Visual App Showcase

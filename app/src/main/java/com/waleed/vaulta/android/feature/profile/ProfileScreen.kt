@@ -83,8 +83,24 @@ fun ProfileScreen(
     val expenses by viewModel.expenses.collectAsState()
     val currentThemeMode by viewModel.themeMode.collectAsState()
     val currentCurrency by viewModel.selectedCurrency.collectAsState()
+    val isAutoDetectEnabled by viewModel.isAutoDetectEnabled.collectAsState()
+    val isNotificationAccessGranted by viewModel.isNotificationAccessGranted.collectAsState()
+    val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
     var showCurrencyDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.onEvent(ProfileUiEvent.OnResume)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let { msg ->
@@ -139,6 +155,78 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissLogout) }) {
                     ExpenseTextView(text = "Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
+    if (uiState.showAutoDetectDisclosureDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ProfileUiEvent.OnDismissAutoDetectDisclosure) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_notification),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        colorFilter = ColorFilter.tint(Zinc)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ExpenseTextView(
+                        text = "Auto-Detect Transactions",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column {
+                    ExpenseTextView(
+                        text = "Vaulta can automatically detect and log your income and expenses when you receive payment notifications from banks, cards, wallets, or UPI apps.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ExpenseTextView(
+                        text = "🔒 100% On-Device & Private:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Zinc
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ExpenseTextView(
+                        text = "• Notifications are analyzed strictly locally on your device.\n• Raw notification text is never saved or uploaded to the cloud.\n• OTPs, security codes, balances, and personal chats are completely ignored.\n• Compatible with Indian UPI (GPay, PhonePe, Paytm) and international banking alerts.",
+                        fontSize = 12.sp,
+                        color = LightGrey,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ExpenseTextView(
+                        text = "ℹ️ Sideloaded APK Notice (Android 13+):\nIf Android restricts notification access, tap 'App Info & Restricted Settings' below, open the 3 dots menu in the top right, and choose 'Allow restricted settings'.",
+                        fontSize = 11.sp,
+                        color = LightGrey.copy(alpha = 0.85f),
+                        lineHeight = 15.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenNotificationSettings) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Zinc),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    ExpenseTextView(text = "Open Notification Settings", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings) }) {
+                        ExpenseTextView(text = "App Info & Restricted Settings", color = Zinc, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissAutoDetectDisclosure) }) {
+                        ExpenseTextView(text = "Cancel", color = LightGrey)
+                    }
                 }
             }
         )
@@ -517,6 +605,128 @@ fun ProfileScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Auto-Detect Transactions Card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(16.dp, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ExpenseTextView(
+                            text = "AUTO-DETECT TRANSACTIONS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = LightGrey,
+                            letterSpacing = 1.sp
+                        )
+
+                        if (isAutoDetectEnabled) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFE8F5E9))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2E7D32))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                ExpenseTextView(
+                                    text = "Listening on-device",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            ExpenseTextView(
+                                text = "Smart Payment Alerts",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            ExpenseTextView(
+                                text = "Automatically log income & expenses from bank, card & payment notifications",
+                                fontSize = 13.sp,
+                                color = LightGrey,
+                                lineHeight = 18.sp
+                            )
+                        }
+
+                        androidx.compose.material3.Switch(
+                            checked = isAutoDetectEnabled,
+                            onCheckedChange = { checked ->
+                                viewModel.onEvent(ProfileUiEvent.OnToggleAutoDetect(checked))
+                            },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Zinc,
+                                uncheckedThumbColor = LightGrey,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
+                    }
+
+                    if (isAutoDetectEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color(0xFFF0F0F0)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Troubleshooting tip
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .clickable { viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings) }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ExpenseTextView(text = "💡", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            ExpenseTextView(
+                                text = "Missing alerts? Ensure Battery Saver is set to 'No restrictions' in App Info",
+                                fontSize = 12.sp,
+                                color = Zinc,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f),
+                                lineHeight = 16.sp
                             )
                         }
                     }
