@@ -1,6 +1,6 @@
 # Privacy Policy for Vaulta - Smart Expense Tracker
 
-**Last updated:** November 19, 2026
+**Last updated:** November 22nd , 2026
 
 **Vaulta - Smart Expense Tracker** ("Vaulta", "we", "us", or "our"), developed by winblader.org, respects your privacy and is committed to protecting the personal data of our users. This Privacy Policy explains how your information is collected, used, and stored when you use the Vaulta Android application (`com.waleed.vaulta.android`).
 
@@ -23,7 +23,7 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.
-- **Notification Access Service (`NotificationListenerService`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature.
+- **Notification Access Service (`NotificationListenerService` / `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature. Processed 100% locally on-device and never transmitted to external servers.
 - **Vibration (`VIBRATE`):** Used to provide haptic feedback during alerts and reminders.
 - **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with Supabase authentication and cloud sync services.
 

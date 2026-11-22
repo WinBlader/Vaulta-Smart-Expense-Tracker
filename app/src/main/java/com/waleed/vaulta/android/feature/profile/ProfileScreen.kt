@@ -871,7 +871,7 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.height(3.dp))
                     ExpenseTextView(
-                        text = "Vaulta • Smart Expense Tracker",
+                        text = "Vaulta v${com.waleed.vaulta.android.BuildConfig.VERSION_NAME} • Smart Expense Tracker",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Normal,
                         color = LightGrey.copy(alpha = 0.8f)
