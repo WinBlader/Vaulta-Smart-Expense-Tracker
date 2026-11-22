@@ -38,8 +38,6 @@
 
 **Vaulta** (`com.waleed.vaulta.android`) is a modern, privacy-focused personal finance manager and expense tracker engineered from the ground up for the Android ecosystem. Combining **offline-first local persistence** with seamless **cloud synchronization**, Vaulta empowers you to monitor daily cash flow, establish monthly budgets, inspect visual spending trends, and export audit-ready reports without sacrificing personal privacy.
 
-Visit the official website: [**https://winblader.org**](https://winblader.org)
-
 ---
 
 ## ✨ Key Features (v1.1.0)
