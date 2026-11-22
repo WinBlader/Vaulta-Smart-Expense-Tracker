@@ -1,13 +1,12 @@
 # 💰 Vaulta — Smart Personal Finance & Expense Tracker
 
 <p align="center">
-  <img src="app/src/main/res/drawable/app_logo.png" width="130" alt="Vaulta Logo" style="border-radius: 28px;"/>
+  <img src="app\src\main\res\drawable\ic_playstore_launcher.jpg" width="130" alt="Vaulta Logo" style="border-radius: 28px;"/>
 </p>
 
 <p align="center">
   <strong>Take absolute control of your personal finances with elegance, precision, and privacy.</strong><br/>
   An intelligent, offline-first Android personal expense tracker and budget manager (<code>com.waleed.vaulta.android</code>) built natively with Jetpack Compose, Material 3, Room Database, and Supabase Cloud Auth.<br/>
-  Official Website: <a href="https://winblader.org"><strong>https://winblader.org</strong></a>
 </p>
 
 <p align="center">
