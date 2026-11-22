@@ -109,15 +109,13 @@ class VaultaNotificationListenerService : NotificationListenerService() {
                     return@launch
                 }
 
-                // If detected currency differs from user's configured currency, note it in title
-                val selectedCurrency = CurrencyManager.getSelectedCurrency()
-                val displayTitle = if (parsed.currencyCode != null &&
-                    !parsed.currencyCode.equals(selectedCurrency.code, ignoreCase = true)
-                ) {
-                    "${parsed.title} [${parsed.currencyCode}]"
-                } else {
-                    parsed.title
+                // If user hasn't explicitly customized their currency yet, adopt detected currency
+                if (!CurrencyManager.hasUserSetCurrency() && parsed.currencyCode != null) {
+                    CurrencyManager.setCurrencyByCode(parsed.currencyCode)
                 }
+
+                // Clean title without raw currency code brackets
+                val displayTitle = parsed.title.replace(Regex("""(?i)\s*\[[A-Z]{3}\]"""), "").trim()
 
                 val expense = ExpenseEntity(
                     id = null,

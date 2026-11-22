@@ -91,9 +91,31 @@ object CurrencyManager {
     fun init(context: Context) {
         if (sharedPreferences == null) {
             sharedPreferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val savedCode = sharedPreferences?.getString(KEY_CURRENCY_CODE, defaultCurrency.code) ?: defaultCurrency.code
-            val found = supportedCurrencies.find { it.code.equals(savedCode, ignoreCase = true) } ?: defaultCurrency
+            val localeDefault = try {
+                val country = Locale.getDefault().country
+                if (country.equals("IN", ignoreCase = true)) {
+                    supportedCurrencies.find { it.code == "INR" } ?: defaultCurrency
+                } else {
+                    val code = java.util.Currency.getInstance(Locale.getDefault())?.currencyCode
+                    supportedCurrencies.find { it.code.equals(code, ignoreCase = true) } ?: defaultCurrency
+                }
+            } catch (_: Exception) {
+                defaultCurrency
+            }
+            val savedCode = sharedPreferences?.getString(KEY_CURRENCY_CODE, localeDefault.code) ?: localeDefault.code
+            val found = supportedCurrencies.find { it.code.equals(savedCode, ignoreCase = true) } ?: localeDefault
             _selectedCurrency.value = found
+        }
+    }
+
+    fun hasUserSetCurrency(): Boolean {
+        return sharedPreferences?.contains(KEY_CURRENCY_CODE) == true
+    }
+
+    fun setCurrencyByCode(code: String) {
+        val found = supportedCurrencies.find { it.code.equals(code, ignoreCase = true) }
+        if (found != null) {
+            setCurrency(found)
         }
     }
 

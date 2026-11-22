@@ -109,10 +109,11 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
 
-    // Receipt Detail & Share Dialog
+    // Receipt Detail, Edit & Share Dialog
     selectedItemForReceipt?.let { item ->
         TransactionReceiptDialog(
             item = item,
+            onEdit = { viewModel.updateExpense(it) },
             onDelete = { viewModel.deleteExpense(it) },
             onDismiss = { selectedItemForReceipt = null }
         )

@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -161,75 +163,150 @@ fun ProfileScreen(
     }
 
     if (uiState.showAutoDetectDisclosureDialog) {
-        AlertDialog(
+        Dialog(
             onDismissRequest = { viewModel.onEvent(ProfileUiEvent.OnDismissAutoDetectDisclosure) },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_notification),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        colorFilter = ColorFilter.tint(Zinc)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    ExpenseTextView(
-                        text = "Auto-Detect Transactions",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-            },
-            text = {
-                Column {
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .wrapContentHeight()
+                    .heightIn(max = 680.dp)
+                    .shadow(24.dp, shape = RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_notification),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            colorFilter = ColorFilter.tint(Zinc)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        ExpenseTextView(
+                            text = "Auto-Detect Transactions",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     ExpenseTextView(
                         text = "Vaulta can automatically detect and log your income and expenses when you receive payment notifications from banks, cards, wallets, or UPI apps.",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    ExpenseTextView(
-                        text = "🔒 100% On-Device & Private:",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Zinc
-                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Zinc.copy(alpha = 0.08f))
+                            .border(1.dp, Zinc.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            ExpenseTextView(
+                                text = "🔒 100% On-Device & Private:",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Zinc
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            ExpenseTextView(
+                                text = "• Notifications are analyzed strictly locally on your device.\n• Raw notification text is never saved or uploaded to the cloud.\n• OTPs, security codes, balances, and personal chats are completely ignored.\n• Compatible with Indian UPI (GPay, PhonePe, Paytm) and international banking alerts.",
+                                fontSize = 11.5.sp,
+                                color = LightGrey,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .padding(12.dp)
+                    ) {
+                        ExpenseTextView(
+                            text = "ℹ️ Sideloaded APK Notice (Android 13+):\nIf Android restricts notification access, tap 'App Info & Restricted Settings' below, open the 3 dots menu in the top right, and choose 'Allow restricted settings'.",
+                            fontSize = 11.sp,
+                            color = LightGrey.copy(alpha = 0.85f),
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenNotificationSettings) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Zinc),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        ExpenseTextView(
+                            text = "Open Notification Settings",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, Zinc.copy(alpha = 0.5f))
+                    ) {
+                        ExpenseTextView(
+                            text = "App Info & Restricted Settings",
+                            color = Zinc,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissAutoDetectDisclosure) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ExpenseTextView(
+                            text = "Cancel",
+                            color = LightGrey,
+                            fontSize = 13.sp
+                        )
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
-                    ExpenseTextView(
-                        text = "• Notifications are analyzed strictly locally on your device.\n• Raw notification text is never saved or uploaded to the cloud.\n• OTPs, security codes, balances, and personal chats are completely ignored.\n• Compatible with Indian UPI (GPay, PhonePe, Paytm) and international banking alerts.",
-                        fontSize = 12.sp,
-                        color = LightGrey,
-                        lineHeight = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    ExpenseTextView(
-                        text = "ℹ️ Sideloaded APK Notice (Android 13+):\nIf Android restricts notification access, tap 'App Info & Restricted Settings' below, open the 3 dots menu in the top right, and choose 'Allow restricted settings'.",
-                        fontSize = 11.sp,
-                        color = LightGrey.copy(alpha = 0.85f),
-                        lineHeight = 15.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenNotificationSettings) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Zinc),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    ExpenseTextView(text = "Open Notification Settings", color = Color.White)
-                }
-            },
-            dismissButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings) }) {
-                        ExpenseTextView(text = "App Info & Restricted Settings", color = Zinc, fontSize = 12.sp)
-                    }
-                    TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissAutoDetectDisclosure) }) {
-                        ExpenseTextView(text = "Cancel", color = LightGrey)
-                    }
                 }
             }
-        )
+        }
     }
 
     if (uiState.showResetEverythingDialog) {

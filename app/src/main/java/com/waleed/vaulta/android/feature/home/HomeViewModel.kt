@@ -44,6 +44,18 @@ class HomeViewModel @Inject constructor(
         budgetRepository.checkBalanceAndNotify(list)
     }
 
+    fun updateExpense(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            val success = expenseRepository.updateExpense(expense)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Transaction updated successfully",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
     fun deleteExpense(expense: ExpenseEntity) {
         viewModelScope.launch {
             val success = expenseRepository.deleteExpense(expense)

@@ -298,6 +298,10 @@ object TransactionNotificationParser {
         val titleIsAppName = appNames.any { title.contains(it, ignoreCase = true) }
 
         val candidatePatterns = listOf(
+            // "<Sender> deposited in your <Bank> account" e.g. "NAVI LIMITED Deposited IN YOUR ICICI BANK Account"
+            Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?deposited\s+(?:in|into|to)\s+(?:your\s+)?([A-Za-z0-9\s]+?)(?:account|a/c|\.|$)"""),
+            // "<Sender> has sent / transferred / credited"
+            Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:sent|transferred|credited)\s+(?:to|in|into)\s+(?:your\s+)?([A-Za-z0-9\s]+?)(?:account|a/c|\.|$)"""),
             // "paid ... to <Merchant>" / "payment of ... to <Merchant>" / "sent ... to <Merchant>"
             Regex("""(?i)\b(?:paid|sent|spent|payment|transfer|transferred)\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "received ... from <Sender>" / "credited ... by <Sender>"
@@ -342,16 +346,50 @@ object TransactionNotificationParser {
     }
 
     private fun cleanMerchantName(name: String): String {
-        return name
+        val trimmed = name.trim()
+
+        // 1. If pure phone number (e.g. 10 to 12 digits or with +91)
+        if (trimmed.matches(Regex("""^\+?\d{10,13}$"""))) {
+            val digits = trimmed.removePrefix("+91").removePrefix("+")
+            return "UPI Transfer ($digits)"
+        }
+
+        // 2. Strip banking boilerplate phrases
+        var stripped = trimmed
+            .replace(Regex("""(?i)\b(?:deposited\s+in|deposited\s+into|credited\s+to|debited\s+from|transferred\s+to|spent\s+on)\s+(?:your\s+)?[A-Za-z0-9\s]+?(?:account|a/c|card|bank)\b.*$"""), "")
+            .replace(Regex("""(?i)\b(?:in|into|from|to)\s+your\s+[A-Za-z0-9\s]+?(?:account|a/c|bank)\b.*$"""), "")
+            .replace(Regex("""(?i)\s*\[?(?:INR|USD|EUR|GBP|AED|SAR|Rs\.?|₹|\$)\]?\s*"""), " ")
             .replace(Regex("""(?i)^(the|m/s|vpa)\s+"""), "")
             .replace(Regex("""(?i)\s+(successful|completed|via\s+upi|using\s+upi|with\s+upi).*$"""), "")
             .replace(Regex("""[.,\-_/]+$"""), "")
             .trim()
+
+        // If stripped is empty or just generic word
+        if (stripped.isBlank() || stripped.equals("Deposited", ignoreCase = true) || stripped.equals("Credited", ignoreCase = true)) {
+            val upperName = name.uppercase(Locale.US)
+            return when {
+                upperName.contains("ICICI") -> "ICICI Bank Deposit"
+                upperName.contains("HDFC") -> "HDFC Bank Deposit"
+                upperName.contains("SBI") -> "SBI Deposit"
+                upperName.contains("AXIS") -> "Axis Bank Deposit"
+                upperName.contains("KOTAK") -> "Kotak Bank Deposit"
+                upperName.contains("PAYTM") -> "Paytm Deposit"
+                else -> ""
+            }
+        }
+
+        // 3. Format words: Title Case for regular words, preserve uppercase for short acronyms
+        val acronyms = setOf("ICICI", "HDFC", "SBI", "PNB", "BOB", "UPI", "ATM", "POS", "VPA", "NEFT", "RTGS", "IMPS", "LTD", "PVT", "LLP")
+        return stripped
             .split(" ")
             .filter { it.isNotBlank() }
             .joinToString(" ") { word ->
-                if (word.length <= 4 && word.all { it.isLetter() }) word.uppercase(Locale.US)
-                else word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                val upperWord = word.uppercase(Locale.US)
+                if (acronyms.contains(upperWord) || (word.length <= 4 && word.all { it.isLetter() } && word.all { it.isUpperCase() })) {
+                    upperWord
+                } else {
+                    word.lowercase(Locale.US).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                }
             }
     }
 

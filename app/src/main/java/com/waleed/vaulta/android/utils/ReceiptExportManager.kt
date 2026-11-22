@@ -637,4 +637,290 @@ object ReceiptExportManager {
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
     }
+
+    /**
+     * Opens an Image (PNG) URI with an installed image viewer.
+     */
+    fun openImage(context: Context, uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "image/png")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(intent, "Open Statement Image"))
+        } catch (_: Exception) {
+            VaultaToast.show(context, "No image viewer found on device.")
+        }
+    }
+
+    /**
+     * Saves a generated PNG bitmap directly into public Downloads/Vaulta.
+     */
+    fun savePngToPublicDownloads(context: Context, bitmap: Bitmap, baseFileName: String): Uri? {
+        val fileName = if (baseFileName.endsWith(".png", ignoreCase = true)) baseFileName else "$baseFileName.png"
+        var savedUri: Uri? = null
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/Vaulta")
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                    savedUri = uri
+                }
+            } else {
+                val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val vaultaFolder = File(publicDownloads, "Vaulta")
+                if (!vaultaFolder.exists()) {
+                    vaultaFolder.mkdirs()
+                }
+                val targetFile = File(vaultaFolder, fileName)
+                FileOutputStream(targetFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                savedUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", targetFile)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            try {
+                val fallbackFile = File(getExportsDir(context), fileName)
+                FileOutputStream(fallbackFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                savedUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fallbackFile)
+            } catch (_: Exception) {}
+        }
+
+        return savedUri
+    }
+
+    /**
+     * Renders complete filtered transactions into a high-resolution PNG statement bitmap.
+     */
+    fun createTransactionsStatementBitmap(
+        transactions: List<ExpenseEntity>,
+        filterType: String,
+        dateRange: String,
+        totalIncome: Double,
+        totalExpense: Double,
+        netBalance: Double
+    ): Bitmap {
+        val width = 1080
+        val baseHeaderHeight = 360f
+        val rowHeight = 60f
+        val rowsCount = transactions.size.coerceAtLeast(1)
+        val calculatedHeight = (baseHeaderHeight + (rowsCount * rowHeight) + 160f).toInt()
+        val height = calculatedHeight.coerceIn(900, 4200)
+
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // Background
+        canvas.drawColor(Color.parseColor("#0F1716"))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Header Banner
+        paint.color = Color.parseColor("#004D40")
+        canvas.drawRect(0f, 0f, width.toFloat(), 130f, paint)
+
+        // Header Title & Subtitle
+        paint.color = Color.WHITE
+        paint.textSize = 34f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textAlign = Paint.Align.LEFT
+        canvas.drawText("VAULTA — FINANCIAL STATEMENT", 50f, 65f, paint)
+
+        paint.color = Color.parseColor("#80CBC4")
+        paint.textSize = 16f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("Filtered by: $filterType • Range: $dateRange", 50f, 102f, paint)
+
+        // KPI Summary Strip
+        paint.color = Color.parseColor("#182523")
+        val kpiRect = RectF(50f, 155f, (width - 50).toFloat(), 265f)
+        canvas.drawRoundRect(kpiRect, 16f, 16f, paint)
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        paint.color = Color.parseColor("#263D39")
+        canvas.drawRoundRect(kpiRect, 16f, 16f, paint)
+        paint.style = Paint.Style.FILL
+
+        // KPI 1: Income
+        paint.textAlign = Paint.Align.LEFT
+        paint.textSize = 14f
+        paint.color = Color.parseColor("#9E9E9E")
+        canvas.drawText("TOTAL INCOME", 80f, 195f, paint)
+        paint.textSize = 24f
+        paint.color = Color.parseColor("#00E676")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("+${Utils.formatCurrency(totalIncome)}", 80f, 235f, paint)
+
+        // KPI 2: Expense
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.textSize = 14f
+        paint.color = Color.parseColor("#9E9E9E")
+        canvas.drawText("TOTAL EXPENSE", 420f, 195f, paint)
+        paint.textSize = 24f
+        paint.color = Color.parseColor("#FF5252")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("-${Utils.formatCurrency(totalExpense)}", 420f, 235f, paint)
+
+        // KPI 3: Net Balance
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        paint.textSize = 14f
+        paint.color = Color.parseColor("#9E9E9E")
+        canvas.drawText("NET BALANCE", 760f, 195f, paint)
+        paint.textSize = 24f
+        paint.color = if (netBalance >= 0) Color.parseColor("#00E676") else Color.parseColor("#FF5252")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val netSign = if (netBalance >= 0) "+" else ""
+        canvas.drawText("$netSign${Utils.formatCurrency(netBalance)}", 760f, 235f, paint)
+
+        // Table Header
+        paint.color = Color.parseColor("#152422")
+        canvas.drawRect(50f, 290f, (width - 50).toFloat(), 335f, paint)
+
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textSize = 15f
+        paint.color = Color.parseColor("#80CBC4")
+        paint.textAlign = Paint.Align.LEFT
+        canvas.drawText("DATE", 70f, 320f, paint)
+        canvas.drawText("TITLE / CATEGORY", 230f, 320f, paint)
+        canvas.drawText("TYPE", 720f, 320f, paint)
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText("AMOUNT", (width - 70).toFloat(), 320f, paint)
+
+        // Table Rows
+        var currentY = 370f
+        if (transactions.isEmpty()) {
+            paint.textAlign = Paint.Align.CENTER
+            paint.color = Color.parseColor("#9E9E9E")
+            paint.textSize = 18f
+            canvas.drawText("No transactions match the selected filter criteria.", (width / 2).toFloat(), currentY + 50f, paint)
+        } else {
+            transactions.forEachIndexed { index, item ->
+                if (currentY > height - 120f) return@forEachIndexed
+
+                // Alternating row background
+                if (index % 2 == 1) {
+                    paint.color = Color.parseColor("#121F1D")
+                    canvas.drawRect(50f, currentY - 26f, (width - 50).toFloat(), currentY + 22f, paint)
+                }
+
+                val isIncome = item.type.equals("Income", ignoreCase = true)
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                paint.textAlign = Paint.Align.LEFT
+                paint.textSize = 14f
+                paint.color = Color.parseColor("#A0B2AF")
+                canvas.drawText(Utils.formatStringDateToMonthDayYear(item.date), 70f, currentY, paint)
+
+                paint.color = Color.WHITE
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                val displayTitle = if (item.title.length > 34) item.title.take(32) + "..." else item.title
+                canvas.drawText(displayTitle, 230f, currentY, paint)
+
+                paint.color = if (isIncome) Color.parseColor("#00E676") else Color.parseColor("#FF8A80")
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                canvas.drawText(item.type, 720f, currentY, paint)
+
+                paint.textAlign = Paint.Align.RIGHT
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                paint.color = if (isIncome) Color.parseColor("#00E676") else Color.parseColor("#FF5252")
+                val sign = if (isIncome) "+" else "-"
+                canvas.drawText("$sign${Utils.formatCurrency(item.amount)}", (width - 70).toFloat(), currentY, paint)
+
+                currentY += rowHeight
+            }
+        }
+
+        // Footer
+        paint.color = Color.parseColor("#263D39")
+        paint.strokeWidth = 1.5f
+        canvas.drawLine(50f, (height - 65).toFloat(), (width - 50).toFloat(), (height - 65).toFloat(), paint)
+
+        paint.textAlign = Paint.Align.LEFT
+        paint.color = Color.parseColor("#617370")
+        paint.textSize = 13f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("Vaulta Smart Expense Tracker • winblader.org", 50f, (height - 30).toFloat(), paint)
+
+        val timestamp = SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault()).format(Date())
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText("Generated on: $timestamp", (width - 50).toFloat(), (height - 30).toFloat(), paint)
+
+        return bitmap
+    }
+
+    /**
+     * Downloads complete filtered transactions statement as PNG into Downloads/Vaulta.
+     */
+    fun downloadTransactionsStatementPng(
+        context: Context,
+        transactions: List<ExpenseEntity>,
+        filterType: String,
+        dateRange: String,
+        totalIncome: Double,
+        totalExpense: Double,
+        netBalance: Double
+    ): Uri? {
+        val bitmap = createTransactionsStatementBitmap(
+            transactions, filterType, dateRange, totalIncome, totalExpense, netBalance
+        )
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "Vaulta_Statement_$timestamp.png"
+        val uri = savePngToPublicDownloads(context, bitmap, fileName)
+
+        if (uri != null) {
+            VaultaToast.showWithAction(
+                message = "PNG saved to Downloads/Vaulta",
+                actionLabel = "VIEW",
+                onAction = { openImage(context, uri) }
+            )
+        } else {
+            VaultaToast.show(context, "Failed to download Statement PNG.")
+        }
+        return uri
+    }
+
+    /**
+     * Shares complete filtered transactions statement as PNG via Android share sheet.
+     */
+    fun exportTransactionsStatementPng(
+        context: Context,
+        transactions: List<ExpenseEntity>,
+        filterType: String,
+        dateRange: String,
+        totalIncome: Double,
+        totalExpense: Double,
+        netBalance: Double
+    ) {
+        val bitmap = createTransactionsStatementBitmap(
+            transactions, filterType, dateRange, totalIncome, totalExpense, netBalance
+        )
+        val file = File(getExportsDir(context), "vaulta_statement_${System.currentTimeMillis()}.png")
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Vaulta Statement PNG ($dateRange)")
+            putExtra(Intent.EXTRA_TEXT, "Financial Statement from Vaulta: $dateRange • Total Net: ${Utils.formatCurrency(netBalance)}")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val chooser = Intent.createChooser(intent, "Share Financial Statement PNG")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
+    }
 }

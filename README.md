@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.3.0%20(Build%204)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.3.0"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.3.1%20(Build%205)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.3.1"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -56,11 +56,11 @@
 - **Preset & Custom Date Ranges:** Browse by *Today*, *This Week*, *This Month*, *Last Month*, or choose an exact custom start and end date using the Material 3 `DateRangePicker`.
 - **Dynamic KPI Balance Strip:** Dynamically updates filtered Total Income, Total Expense, and Net Balance with a one-tap **Reset Filters** action.
 
-### 3. 📄 PDF Statements & Receipt Sharing
-- **Direct PDF Downloads:** Export full financial statements directly into the device's public `Downloads/Vaulta/` directory using Android Scoped Storage (`MediaStore.Downloads`) without runtime storage permission prompts.
-- **Single Receipt Export:** Generate branded, itemized transaction receipt cards with official Vaulta headers, verification IDs, timestamps, and active currency symbols.
-- **PDF Sharing:** Share individual receipts as high-resolution **PDF documents** directly via the Android share sheet.
-- **Instant Open Action:** In-app download notifications include an **"OPEN"** button to launch the saved document in your preferred PDF viewer.
+### 3. 📄 PDF & PNG Statements & Receipt Sharing
+- **Direct PDF & PNG Downloads:** Export full financial statements as audit-ready **PDF documents** or high-resolution **PNG images** directly into the device's public `Downloads/Vaulta/` directory using Android Scoped Storage (`MediaStore.Downloads`) without runtime storage permission prompts.
+- **Single Receipt Export & Sharing:** Generate branded, itemized transaction receipt cards with official Vaulta headers, verification IDs, timestamps, and active currency symbols, exportable as **PDF** or **PNG**.
+- **Multi-Format Share Sheet:** Share individual receipts or the complete filtered transaction statement directly via WhatsApp, Telegram, Gmail, or any installed messaging app.
+- **Instant Open Action:** In-app download notifications include an **"OPEN"** / **"VIEW"** button to launch the saved PDF or PNG in your preferred viewer.
 
 ### 4. 📊 Visual Spending Analytics
 - **Cubic-Bezier Velocity Curves:** Smooth, anti-aliased charts powered by MPAndroidChart with gradient fill effects.
@@ -88,6 +88,10 @@
 - **Item Detail Removal:** Direct **Delete Transaction** action button inside the itemized receipt view with safety confirmation.
 - **Instant Undo:** Vaulta-branded snackbar with a 4.5-second **UNDO** button to instantly restore accidentally deleted entries.
 - **In-App "Reset Everything":** Double-confirmed safety reset option in the Profile screen under *Data & Privacy* to permanently wipe local transactions, reset budgets to zero, and clear auto-detect preferences for the active user account.
+
+### 8. ✏️ Full Transaction Editing
+- **In-Place Modification:** Update any transaction title/merchant, amount, type (Income or Expense), category, and date directly from the itemized receipt view.
+- **Reactive State Sync:** Instantly recalculates cash flow velocity curves, monthly spends, category breakdowns, and net balances across RoomDB and Supabase.
 
 ---
 
@@ -203,7 +207,7 @@ Vaulta/
 │   │   │   │   └── Vaulta.kt                # Application class (@HiltAndroidApp)
 │   │   │   └── res/                         # Vector drawables, mipmaps, string resources
 │   │   └── test/                            # Unit and instrumentation tests
-│   ├── build.gradle.kts                     # App module build configuration (v1.3.0)
+│   ├── build.gradle.kts                     # App module build configuration (v1.3.1)
 │   └── proguard-rules.pro                   # ProGuard / R8 rules
 ├── screenshots/                             # High-resolution application screenshots
 ├── PRIVACY_POLICY.md                        # Official Privacy Policy

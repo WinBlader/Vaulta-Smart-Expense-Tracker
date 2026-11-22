@@ -27,17 +27,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +63,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.waleed.vaulta.android.ui.theme.Zinc
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -97,7 +106,7 @@ fun TransactionListScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     var showCustomDatePicker by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
-    var showExportPdfDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.navigationEvent.collect { event ->
@@ -107,10 +116,11 @@ fun TransactionListScreen(
         }
     }
 
-    // Receipt Detail & Share Dialog
+    // Receipt Detail, Edit & Share Dialog
     selectedItemForReceipt?.let { item ->
         TransactionReceiptDialog(
             item = item,
+            onEdit = { viewModel.onEvent(TransactionListUiEvent.OnUpdateTransaction(it)) },
             onDelete = { viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(it)) },
             onDismiss = { selectedItemForReceipt = null }
         )
@@ -164,93 +174,220 @@ fun TransactionListScreen(
         }
     }
 
-    // Export Statement PDF Dialog (Direct Download & Share)
-    if (showExportPdfDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showExportPdfDialog = false },
-            title = {
-                Text(
-                    text = "Export Financial Statement",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Period: ${uiState.dateRange} • ${uiState.transactions.size} records",
-                        fontSize = 13.5.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Net Balance: ${Utils.formatCurrency(uiState.netBalance)}",
-                        fontSize = 13.sp,
-                        color = if (uiState.netBalance >= 0) Green else Red,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Choose whether to directly save the statement PDF to your device's Downloads/Vaulta folder or share it via the Android share sheet.",
-                        fontSize = 12.sp,
-                        color = LightGrey,
-                        lineHeight = 16.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+    // Export Statement Dialog (PDF & PNG - Download & Share)
+    if (showExportDialog) {
+        Dialog(
+            onDismissRequest = { showExportDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .wrapContentHeight()
+                    .heightIn(max = 680.dp)
+                    .shadow(24.dp, shape = RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Direct Download PDF Button
-                    Button(
-                        onClick = {
-                            showExportPdfDialog = false
-                            ReceiptExportManager.downloadTransactionsStatementPdf(
-                                context = context,
-                                transactions = uiState.transactions,
-                                filterType = uiState.filterType,
-                                dateRange = uiState.dateRange,
-                                totalIncome = uiState.totalIncome,
-                                totalExpense = uiState.totalExpense,
-                                netBalance = uiState.netBalance
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("📥 Download", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        Column {
+                            ExpenseTextView(
+                                text = "Export Statement",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            ExpenseTextView(
+                                text = "Period: ${uiState.dateRange} • ${uiState.transactions.size} records",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        TextButton(onClick = { showExportDialog = false }) {
+                            ExpenseTextView(text = "✕", fontSize = 16.sp, color = LightGrey, fontWeight = FontWeight.Bold)
+                        }
                     }
 
-                    // Share PDF Button
-                    OutlinedButton(
-                        onClick = {
-                            showExportPdfDialog = false
-                            ReceiptExportManager.exportTransactionsStatementPdf(
-                                context = context,
-                                transactions = uiState.transactions,
-                                filterType = uiState.filterType,
-                                dateRange = uiState.dateRange,
-                                totalIncome = uiState.totalIncome,
-                                totalExpense = uiState.totalExpense,
-                                netBalance = uiState.netBalance
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Summary box
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(12.dp)
                     ) {
-                        Text("Share PDF", fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                ExpenseTextView(text = "Total Income", fontSize = 11.sp, color = LightGrey)
+                                ExpenseTextView(text = "+${Utils.formatCurrency(uiState.totalIncome)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Green)
+                            }
+                            Column {
+                                ExpenseTextView(text = "Total Expense", fontSize = 11.sp, color = LightGrey)
+                                ExpenseTextView(text = "-${Utils.formatCurrency(uiState.totalExpense)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Red)
+                            }
+                            Column {
+                                ExpenseTextView(text = "Net Balance", fontSize = 11.sp, color = LightGrey)
+                                ExpenseTextView(
+                                    text = Utils.formatCurrency(uiState.netBalance),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (uiState.netBalance >= 0) Green else Red
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Section 1: PDF Format
+                    ExpenseTextView(
+                        text = "PDF DOCUMENT STATEMENT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LightGrey,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showExportDialog = false
+                                ReceiptExportManager.downloadTransactionsStatementPdf(
+                                    context = context,
+                                    transactions = uiState.transactions,
+                                    filterType = uiState.filterType,
+                                    dateRange = uiState.dateRange,
+                                    totalIncome = uiState.totalIncome,
+                                    totalExpense = uiState.totalExpense,
+                                    netBalance = uiState.netBalance
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Download PDF", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                showExportDialog = false
+                                ReceiptExportManager.exportTransactionsStatementPdf(
+                                    context = context,
+                                    transactions = uiState.transactions,
+                                    filterType = uiState.filterType,
+                                    dateRange = uiState.dateRange,
+                                    totalIncome = uiState.totalIncome,
+                                    totalExpense = uiState.totalExpense,
+                                    netBalance = uiState.netBalance
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                        ) {
+                            Text("Share PDF", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Section 2: PNG Format
+                    ExpenseTextView(
+                        text = "PNG IMAGE STATEMENT",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = LightGrey,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showExportDialog = false
+                                ReceiptExportManager.downloadTransactionsStatementPng(
+                                    context = context,
+                                    transactions = uiState.transactions,
+                                    filterType = uiState.filterType,
+                                    dateRange = uiState.dateRange,
+                                    totalIncome = uiState.totalIncome,
+                                    totalExpense = uiState.totalExpense,
+                                    netBalance = uiState.netBalance
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Zinc)
+                        ) {
+                            Text("Download PNG", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                showExportDialog = false
+                                ReceiptExportManager.exportTransactionsStatementPng(
+                                    context = context,
+                                    transactions = uiState.transactions,
+                                    filterType = uiState.filterType,
+                                    dateRange = uiState.dateRange,
+                                    totalIncome = uiState.totalIncome,
+                                    totalExpense = uiState.totalExpense,
+                                    netBalance = uiState.netBalance
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Zinc.copy(alpha = 0.5f))
+                        ) {
+                            Text("Share PNG", fontSize = 12.sp, color = Zinc, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    TextButton(
+                        onClick = { showExportDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        ExpenseTextView(text = "Close", color = LightGrey, fontSize = 13.sp)
                     }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExportPdfDialog = false }) {
-                    Text("Cancel", color = LightGrey)
-                }
             }
-        )
+        }
     }
 
     Scaffold(
@@ -290,23 +427,33 @@ fun TransactionListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Export PDF Button
+                        // Export (PDF & PNG) Button
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                 .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                                 .clickable {
-                                    showExportPdfDialog = true
+                                    showExportDialog = true
                                 }
-                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
                         ) {
-                            Text(
-                                text = "📄 PDF",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Export",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "PDF/PNG",
+                                    fontSize = 9.sp,
+                                    color = LightGrey
+                                )
+                            }
                         }
 
                         // Filter Menu Toggle

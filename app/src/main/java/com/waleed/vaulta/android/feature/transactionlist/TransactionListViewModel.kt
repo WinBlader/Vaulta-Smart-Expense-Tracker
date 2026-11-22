@@ -173,6 +173,17 @@ class TransactionListViewModel @Inject constructor(
                     }
                 }
             }
+            is TransactionListUiEvent.OnUpdateTransaction -> {
+                viewModelScope.launch {
+                    val success = expenseRepository.updateExpense(event.expense)
+                    if (success) {
+                        com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                            message = "Transaction updated successfully",
+                            durationMs = 3000L
+                        )
+                    }
+                }
+            }
             is TransactionListUiEvent.OnBackPressed -> {
                 viewModelScope.launch {
                     _navigationEvent.emit(NavigationEvent.NavigateBack)
@@ -278,5 +289,6 @@ sealed class TransactionListUiEvent : UiEvent() {
     data class OnCustomDateRangeSelected(val startMillis: Long, val endMillis: Long) : TransactionListUiEvent()
     data object OnResetFilters : TransactionListUiEvent()
     data class OnDeleteTransaction(val expense: ExpenseEntity) : TransactionListUiEvent()
+    data class OnUpdateTransaction(val expense: ExpenseEntity) : TransactionListUiEvent()
     data object OnBackPressed : TransactionListUiEvent()
 }
