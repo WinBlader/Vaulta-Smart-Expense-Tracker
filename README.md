@@ -112,10 +112,10 @@
 | <img src="screenshots/07_spends_dashboard.png" width="270" alt="Spends Dashboard"/> | <img src="screenshots/08_statistics_expenses.png" width="270" alt="Expenses Statistics"/> | <img src="screenshots/09_statistics_income.png" width="270" alt="Income Statistics"/> |
 | *Category progress bar, spend splits, and monthly budget limits.* | *Cubic-bezier expense velocity chart with ranked top expenses.* | *Earnings graph displaying revenue trajectories across custom dates.* |
 
-| 💱 Currency & Theme Settings | 👤 User Account Details | 📑 Category Allocation View |
-| :---: | :---: | :---: |
-| <img src="screenshots/10_profile_currency_theme.png" width="270" alt="Currency and Theme Settings"/> | <img src="screenshots/11_profile_account_details.png" width="270" alt="Account Details"/> | <img src="screenshots/12_budget_spends_overview.png" width="270" alt="Budget Overview"/> |
-| *Global currency selector (₹, $, €, £, AED, etc.) and OLED dark theme.* | *Profile card with verified auth status and transaction counter.* | *Month-by-month category spend distribution and insights.* |
+| 👤 Guest & Account Details | ⚙️ Currency, Auto-Detect & Settings |
+| :---: | :---: |
+| <img src="screenshots/10_profile_account.png" width="270" alt="Profile Account Details"/> | <img src="screenshots/11_profile_settings.png" width="270" alt="Profile Settings"/> |
+| *Account profile with active guest/cloud status, transactions count, and user details.* | *INR/global currency switcher, Auto-Detect notification toggle, and Material 3 theme modes.* |
 
 ---
 
