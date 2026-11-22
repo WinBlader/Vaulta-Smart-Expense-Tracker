@@ -258,10 +258,9 @@ For complete details, please read our official [**PRIVACY_POLICY.md**](PRIVACY_P
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete details.
 
 ### Author & Contact
-**Waleed Wani**
-- **Website:** [https://winblader.org](https://winblader.org)
+**winblader.org**
 - **GitHub:** [@WinBlader](https://github.com/WinBlader)
-- **Email:** `waleedwani9@gmail.com`
+- **Email:** `winblader.org@gmail.com`
 - **Repository:** [WinBlader/Vaulta-Smart-Expense-Tracker](https://github.com/WinBlader/Vaulta-Smart-Expense-Tracker)
 
 <p align="center">
