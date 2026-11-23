@@ -87,6 +87,7 @@ fun ProfileScreen(
     val currentCurrency by viewModel.selectedCurrency.collectAsState()
     val isAutoDetectEnabled by viewModel.isAutoDetectEnabled.collectAsState()
     val isNotificationAccessGranted by viewModel.isNotificationAccessGranted.collectAsState()
+    val isServiceConnected by viewModel.isServiceConnected.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
     var showCurrencyDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -248,7 +249,7 @@ fun ProfileScreen(
                             .padding(12.dp)
                     ) {
                         ExpenseTextView(
-                            text = "ℹ️ Sideloaded APK Notice (Android 13+):\nIf Android restricts notification access, tap 'App Info & Restricted Settings' below, open the 3 dots menu in the top right, and choose 'Allow restricted settings'.",
+                            text = "ℹ️ Device Setup & MIUI / HyperOS Notice:\n• Android 13+ sideload: Tap 'App Info & Restricted Settings' below, open 3-dots menu (top-right), and choose 'Allow restricted settings'.\n• Xiaomi / Redmi / POCO (MIUI & HyperOS): Enable 'Autostart' and select Battery Saver 'No restrictions' in App Info for uninterrupted tracking.",
                             fontSize = 11.sp,
                             color = LightGrey.copy(alpha = 0.85f),
                             lineHeight = 15.sp
@@ -764,25 +765,29 @@ fun ProfileScreen(
                         )
 
                         if (isAutoDetectEnabled) {
+                            val badgeBg = if (isServiceConnected) Color(0xFFE8F5E9) else if (isNotificationAccessGranted) Color(0xFFFFF3E0) else Color(0xFFEEEEEE)
+                            val dotColor = if (isServiceConnected) Color(0xFF2E7D32) else if (isNotificationAccessGranted) Color(0xFFE65100) else Color(0xFF757575)
+                            val badgeText = if (isServiceConnected) "Active & Connected" else if (isNotificationAccessGranted) "Permission Granted" else "Access Required"
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFE8F5E9))
+                                    .background(badgeBg)
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF2E7D32))
+                                        .background(dotColor)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 ExpenseTextView(
-                                    text = "Listening on-device",
+                                    text = badgeText,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF2E7D32)
+                                    color = dotColor
                                 )
                             }
                         }
@@ -837,7 +842,7 @@ fun ProfileScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Troubleshooting tip
+                        // MIUI / Xiaomi / OEM Troubleshooting tip
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -847,15 +852,35 @@ fun ProfileScreen(
                                 .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            ExpenseTextView(text = "💡", fontSize = 14.sp)
+                            ExpenseTextView(text = "⚡", fontSize = 14.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             ExpenseTextView(
-                                text = "Missing alerts? Ensure Battery Saver is set to 'No restrictions' in App Info",
-                                fontSize = 12.sp,
+                                text = "Xiaomi / Redmi / POCO (MIUI & HyperOS): Enable 'Autostart' and set Battery Saver to 'No restrictions' in App Info for uninterrupted tracking.",
+                                fontSize = 11.5.sp,
                                 color = Zinc,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.weight(1f),
                                 lineHeight = 16.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Test Auto-Detect Button
+                        OutlinedButton(
+                            onClick = { viewModel.onEvent(ProfileUiEvent.OnTestAutoDetect) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Zinc.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Zinc)
+                        ) {
+                            ExpenseTextView(text = "🧪", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            ExpenseTextView(
+                                text = "Test Auto-Detect (Simulate Sample SMS)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Zinc
                             )
                         }
                     }

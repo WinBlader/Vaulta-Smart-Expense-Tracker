@@ -16,8 +16,100 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 1. Indian Bank SMS & UPI Alerts
+    // 1. Real-World Indian Bank SMS & UPI Alerts
     // ============================================================
+
+    @Test
+    fun testStandardIndianBankSmsFormats() {
+        // Rs. 500.00 debited from A/c XX1234
+        val res1 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Bank Alert",
+            text = "Rs. 500.00 debited from A/c XX1234 on 23-Nov-26. Info: Swiggy. Avl Bal: Rs 12,000.00"
+        )
+        assertNotNull(res1)
+        assertEquals("Expense", res1!!.type)
+        assertEquals(500.0, res1.amount, 0.01)
+        assertEquals("Food", res1.category)
+
+        // INR 1,250.00 credited to A/c
+        val res2 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Bank Alert",
+            text = "INR 1,250.00 credited to A/c XX4321 by transfer from Rahul. Avl bal: INR 15,000.00"
+        )
+        assertNotNull(res2)
+        assertEquals("Income", res2!!.type)
+        assertEquals(1250.0, res2.amount, 0.01)
+
+        // Sent Rs.250 to Merchant via UPI
+        val res3 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.nbu.paisa.user",
+            title = "Google Pay",
+            text = "Sent Rs.250 to Chai Point via UPI"
+        )
+        assertNotNull(res3)
+        assertEquals("Expense", res3!!.type)
+        assertEquals(250.0, res3.amount, 0.01)
+        assertEquals("Food", res3.category)
+        assertTrue(res3.title.contains("Chai Point", ignoreCase = true))
+
+        // Paid ₹180.00 to Zomato
+        val res4 = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = "Paid ₹180.00 to Zomato"
+        )
+        assertNotNull(res4)
+        assertEquals("Expense", res4!!.type)
+        assertEquals(180.0, res4.amount, 0.01)
+        assertEquals("Food", res4.category)
+        assertTrue(res4.title.contains("Zomato", ignoreCase = true))
+
+        // Acct XX987 debited with INR 450.00
+        val res5 = TransactionNotificationParser.parse(
+            packageName = "com.android.mms",
+            title = "Axis Bank",
+            text = "Acct XX987 debited with INR 450.00 on 23-Nov-26 at McDonald. Avl Bal: INR 8,400.00"
+        )
+        assertNotNull(res5)
+        assertEquals("Expense", res5!!.type)
+        assertEquals(450.0, res5.amount, 0.01)
+        assertEquals("Food", res5.category)
+
+        // Received Rs 1000 from ...
+        val res6 = TransactionNotificationParser.parse(
+            packageName = "net.one97.paytm",
+            title = "Paytm",
+            text = "Received Rs 1000 from Priya via UPI"
+        )
+        assertNotNull(res6)
+        assertEquals("Income", res6!!.type)
+        assertEquals(1000.0, res6.amount, 0.01)
+
+        // Debited by Rs 99
+        val res7 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "SBI",
+            text = "A/c *8901 is debited by Rs 99.00 on 23-Nov-26 at Netflix. Avl Bal: Rs 4,500.00"
+        )
+        assertNotNull(res7)
+        assertEquals("Expense", res7!!.type)
+        assertEquals(99.0, res7.amount, 0.01)
+        assertEquals("Entertainment", res7.category)
+
+        // Spent Rs. 1,499 on HDFC Card
+        val res8 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "HDFC Bank",
+            text = "Spent Rs. 1,499 on HDFC Card ending 1234 at Amazon Retail on 23-Nov-26."
+        )
+        assertNotNull(res8)
+        assertEquals("Expense", res8!!.type)
+        assertEquals(1499.0, res8.amount, 0.01)
+        assertEquals("Shopping", res8.category)
+        assertTrue(res8.title.contains("Amazon", ignoreCase = true))
+    }
 
     @Test
     fun testHdfcBankDebitSms() {
@@ -62,6 +154,31 @@ class TransactionNotificationParserTest {
     }
 
     @Test
+    fun testKotakBankDebitSms() {
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Kotak Bank",
+            text = "Sent Rs. 650.00 from Kotak Bank A/c 9876 to Blinkit on 23-11-2026. Ref no: 8493021."
+        )
+        assertNotNull(result)
+        assertEquals("Expense", result!!.type)
+        assertEquals(650.0, result.amount, 0.01)
+        assertEquals("Grocery", result.category)
+    }
+
+    @Test
+    fun testNaviLimitedCreditSms() {
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "ICICI Bank",
+            text = "NAVI LIMITED Deposited IN YOUR ICICI BANK Account XX123 INR 5,000.00 on 23-Nov-26. Avl Bal: INR 25,000.00"
+        )
+        assertNotNull(result)
+        assertEquals("Income", result!!.type)
+        assertEquals(5000.0, result.amount, 0.01)
+    }
+
+    @Test
     fun testJnKBankCreditSalarySms() {
         val result = TransactionNotificationParser.parse(
             packageName = "com.samsung.android.messaging",
@@ -103,7 +220,57 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 2. International Bank & Digital Wallet Alerts
+    // 2. OTP Disclaimer Tolerance (Must NOT reject real transaction)
+    // ============================================================
+
+    @Test
+    fun testSmsWithBankOtpDisclaimerIsNotRejected() {
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "SBI",
+            text = "Dear Customer, Rs.500.00 has been debited from account **1234 on 23-11-2026. Info: Swiggy. Bank never asks for OTP or PIN. Never share with anyone."
+        )
+        assertNotNull(result)
+        assertEquals("Expense", result!!.type)
+        assertEquals(500.0, result.amount, 0.01)
+        assertEquals("Food", result.category)
+    }
+
+    @Test
+    fun testSmsWithReferenceAndUtrNumbers() {
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "HDFC Bank",
+            text = "INR 2,400.00 debited from A/c XX4567 on 23-Nov-26 to Zomato. Ref: UPI/234901823/UTR 987654. Do not share password."
+        )
+        assertNotNull(result)
+        assertEquals("Expense", result!!.type)
+        assertEquals(2400.0, result.amount, 0.01)
+        assertEquals("Food", result.category)
+    }
+
+    // ============================================================
+    // 3. Multi-Field Extraction (BigText, SubText, TextLines)
+    // ============================================================
+
+    @Test
+    fun testExtractionFromBigTextAndTextLines() {
+        // When text is short summary ("1 new message") and full detail is in textLines or bigText
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "ICICI Bank",
+            text = "1 new message",
+            bigText = "Dear Customer, your ICICI Bank Acc XX567 is debited for INR 1,200.00 on 23-Nov-26. Info: Apollo Pharmacy.",
+            textLines = "ICICI Bank: debited for INR 1,200.00 at Apollo Pharmacy"
+        )
+        assertNotNull(result)
+        assertEquals("Expense", result!!.type)
+        assertEquals(1200.0, result.amount, 0.01)
+        assertEquals("Healthcare", result.category)
+    }
+
+    // ============================================================
+    // 4. International Bank & Digital Wallet Alerts
     // ============================================================
 
     @Test
@@ -195,7 +362,7 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 3. Balance Exclusion Tests (Avl Bal must NOT override amount)
+    // 5. Balance Exclusion Tests (Avl Bal must NOT override amount)
     // ============================================================
 
     @Test
@@ -221,11 +388,11 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 4. Noise, Scam, OTP, Declined & Request Rejections
+    // 6. Noise, Scam, OTP, Declined & Balance-Only Rejections
     // ============================================================
 
     @Test
-    fun testOtpMessageIsRejected() {
+    fun testPureOtpMessageIsRejected() {
         val result = TransactionNotificationParser.parse(
             packageName = "com.google.android.apps.messaging",
             title = "Bank OTP",
@@ -284,28 +451,38 @@ class TransactionNotificationParserTest {
         assertNull(result)
     }
 
+    @Test
+    fun testBalanceOnlyAlertIsRejected() {
+        val result = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "SBI Bank",
+            text = "Your available balance in A/c XX1234 is Rs. 15,000.00."
+        )
+        assertNull(result)
+    }
+
     // ============================================================
-    // 5. 2-Minute Deduplication Engine Tests
+    // 7. 8-Second Tight Deduplication Engine Tests
     // ============================================================
 
     @Test
-    fun testDuplicateSuppressionWithinTwoMinutes() {
+    fun testTightDeduplicationEngine() {
         val now = 1000000000L
 
-        // First notification: Bank SMS for Rs 250
-        val isFirstDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", now)
+        // First notification: Bank SMS for Rs 250 at Swiggy
+        val isFirstDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now)
         assertFalse(isFirstDuplicate)
 
-        // Second notification: GPay push alert 15 seconds later for the same Rs 250
-        val isSecondDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", now + 15_000L)
+        // Second notification: GPay push alert 3 seconds later for same Rs 250 at Swiggy -> duplicate!
+        val isSecondDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now + 3_000L)
         assertTrue(isSecondDuplicate)
 
-        // Third notification: Different amount 30 seconds later -> should NOT be duplicate
-        val isDifferentAmountDuplicate = TransactionDeduplicator.isDuplicate(400.0, "Expense", now + 30_000L)
-        assertFalse(isDifferentAmountDuplicate)
+        // Third notification: Same Rs 250, but at Chai Point 5 seconds later -> NOT a duplicate!
+        val isDifferentMerchantDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Chai Point", now + 5_000L)
+        assertFalse(isDifferentMerchantDuplicate)
 
-        // Fourth notification: Same Rs 250 amount, but 3 minutes later -> should NOT be duplicate
-        val isAfterTwoMinutesDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", now + 180_000L)
-        assertFalse(isAfterTwoMinutesDuplicate)
+        // Fourth notification: Same Swiggy Rs 250, but 10 seconds later (> 8s window) -> NOT a duplicate!
+        val isAfterWindowDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now + 10_000L)
+        assertFalse(isAfterWindowDuplicate)
     }
 }

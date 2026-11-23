@@ -1,17 +1,20 @@
 package com.waleed.vaulta.android.data.notification
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.core.app.NotificationManagerCompat
 
 object NotificationAccessHelper {
 
     private const val PREFS_NAME = "vaulta_notification_prefs"
     private const val KEY_IS_AUTO_DETECT_PREFIX = "is_auto_detect_enabled_"
+    private const val KEY_IS_AUTO_DETECT_GLOBAL = "is_auto_detect_enabled_global"
 
     /**
      * Checks whether Vaulta's NotificationListenerService is enabled in system settings.
@@ -24,6 +27,27 @@ object NotificationAccessHelper {
         // Fallback check against Settings.Secure
         val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
         return flat != null && flat.contains(packageName)
+    }
+
+    /**
+     * Checks whether the NotificationListenerService is currently connected and active.
+     */
+    fun isServiceConnected(): Boolean {
+        return VaultaNotificationListenerService.isServiceConnected
+    }
+
+    /**
+     * Requests rebind of the NotificationListenerService if permission is granted.
+     * Essential for MIUI / HyperOS (Xiaomi / Redmi) after app boot or memory pressure.
+     */
+    fun checkAndRequestRebind(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isNotificationListenerEnabled(context)) {
+            try {
+                NotificationListenerService.requestRebind(
+                    ComponentName(context, VaultaNotificationListenerService::class.java)
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     /**
@@ -61,19 +85,24 @@ object NotificationAccessHelper {
     }
 
     /**
-     * Returns whether the user has toggled ON the Auto-Detect feature for their account.
+     * Returns whether the user has toggled ON the Auto-Detect feature.
+     * Supports both userKey-specific and global fallback flags to prevent state mismatch.
      */
     fun isAutoDetectEnabled(context: Context, userKey: String = "guest"): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_IS_AUTO_DETECT_PREFIX + userKey, false)
+        return prefs.getBoolean(KEY_IS_AUTO_DETECT_PREFIX + userKey, false) ||
+                prefs.getBoolean(KEY_IS_AUTO_DETECT_GLOBAL, false)
     }
 
     /**
-     * Persists the Auto-Detect enabled toggle for the specified user account.
+     * Persists the Auto-Detect enabled toggle for the specified user account and global fallback.
      */
     fun setAutoDetectEnabled(context: Context, enabled: Boolean, userKey: String = "guest") {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_IS_AUTO_DETECT_PREFIX + userKey, enabled).apply()
+        prefs.edit()
+            .putBoolean(KEY_IS_AUTO_DETECT_PREFIX + userKey, enabled)
+            .putBoolean(KEY_IS_AUTO_DETECT_GLOBAL, enabled)
+            .apply()
     }
 
     /**
@@ -81,6 +110,9 @@ object NotificationAccessHelper {
      */
     fun resetAutoDetect(context: Context, userKey: String = "guest") {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove(KEY_IS_AUTO_DETECT_PREFIX + userKey).apply()
+        prefs.edit()
+            .remove(KEY_IS_AUTO_DETECT_PREFIX + userKey)
+            .remove(KEY_IS_AUTO_DETECT_GLOBAL)
+            .apply()
     }
 }

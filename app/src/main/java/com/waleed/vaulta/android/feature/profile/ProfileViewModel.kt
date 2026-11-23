@@ -63,6 +63,11 @@ class ProfileViewModel @Inject constructor(
     )
     val isNotificationAccessGranted: StateFlow<Boolean> = _isNotificationAccessGranted.asStateFlow()
 
+    private val _isServiceConnected = MutableStateFlow(
+        NotificationAccessHelper.isServiceConnected()
+    )
+    val isServiceConnected: StateFlow<Boolean> = _isServiceConnected.asStateFlow()
+
     private val _isAutoDetectEnabled = MutableStateFlow(
         NotificationAccessHelper.isNotificationListenerEnabled(context) &&
                 NotificationAccessHelper.isAutoDetectEnabled(context, sessionManager.getCurrentUserKey())
@@ -85,6 +90,9 @@ class ProfileViewModel @Inject constructor(
         _isIgnoringBatteryOptimizations.value = NotificationAccessHelper.isIgnoringBatteryOptimizations(context)
 
         if (granted) {
+            NotificationAccessHelper.checkAndRequestRebind(context)
+            _isServiceConnected.value = NotificationAccessHelper.isServiceConnected()
+
             // If user granted permission in settings and returned (or had it previously enabled)
             if (pendingAutoDetectEnable || NotificationAccessHelper.isAutoDetectEnabled(context, userKey)) {
                 NotificationAccessHelper.setAutoDetectEnabled(context, true, userKey)
@@ -95,6 +103,7 @@ class ProfileViewModel @Inject constructor(
             // Permission was revoked or not yet granted
             NotificationAccessHelper.setAutoDetectEnabled(context, false, userKey)
             _isAutoDetectEnabled.value = false
+            _isServiceConnected.value = false
         }
     }
 
@@ -242,6 +251,43 @@ class ProfileViewModel @Inject constructor(
                 }
             }
 
+            is ProfileUiEvent.OnTestAutoDetect -> {
+                viewModelScope.launch {
+                    val userKey = sessionManager.getCurrentUserKey()
+                    val sampleTitle = "HDFC Bank"
+                    val sampleBody = "HDFC Bank: Rs 249.00 debited from a/c **1234 on 23-11-26 at SWIGGY. Avl bal: Rs 14,800.00"
+                    val parsed = com.waleed.vaulta.android.data.notification.TransactionNotificationParser.parse(
+                        packageName = "com.google.android.apps.messaging",
+                        title = sampleTitle,
+                        text = sampleBody
+                    )
+                    if (parsed != null) {
+                        val expense = com.waleed.vaulta.android.data.model.ExpenseEntity(
+                            id = null,
+                            title = parsed.title,
+                            amount = parsed.amount,
+                            date = com.waleed.vaulta.android.utils.Utils.formatDateToHumanReadableForm(parsed.timestamp),
+                            type = parsed.type,
+                            userId = userKey
+                        )
+                        val inserted = expenseRepository.insertExpense(expense)
+                        if (inserted) {
+                            _uiState.value = _uiState.value.copy(
+                                message = "Test transaction auto-detected & logged! Check your transaction list."
+                            )
+                        } else {
+                            _uiState.value = _uiState.value.copy(
+                                message = "Failed to save test transaction to database."
+                            )
+                        }
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            message = "Test parser failed to detect sample transaction."
+                        )
+                    }
+                }
+            }
+
             is ProfileUiEvent.OnRequestResetEverything -> {
                 _uiState.value = _uiState.value.copy(showResetEverythingDialog = true)
             }
@@ -295,6 +341,7 @@ sealed class ProfileUiEvent : UiEvent() {
     data object OnLogoutClicked : ProfileUiEvent()
     data object OnDismissLogout : ProfileUiEvent()
     data object OnConfirmLogout : ProfileUiEvent()
+    data object OnTestAutoDetect : ProfileUiEvent()
     data object OnRequestResetEverything : ProfileUiEvent()
     data object OnDismissResetEverything : ProfileUiEvent()
     data object OnConfirmResetEverything : ProfileUiEvent()

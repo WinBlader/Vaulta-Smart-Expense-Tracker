@@ -2,7 +2,6 @@ package com.waleed.vaulta.android.data.notification
 
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import java.util.regex.Pattern
 
 data class ParsedTransaction(
     val title: String,
@@ -17,16 +16,19 @@ data class ParsedTransaction(
 
 /**
  * Thread-safe deduplication engine to suppress duplicate transaction logs
- * (e.g. when Bank SMS and UPI/Wallet push alert fire simultaneously within 2 minutes).
+ * (e.g. when Bank SMS and UPI/Wallet push alert fire simultaneously for the exact same transaction).
+ * Uses a tight time window (8 seconds) keyed on type, amount, and merchant name
+ * so legitimate back-to-back or same-day transactions are never dropped.
  */
 object TransactionDeduplicator {
-    private const val DEDUP_WINDOW_MILLIS = 120_000L // 2 minutes
+    private const val DEDUP_WINDOW_MILLIS = 8_000L // 8 seconds
     private val recentTransactions = ConcurrentHashMap<String, Long>()
 
     @Synchronized
     fun isDuplicate(
         amount: Double,
         type: String,
+        merchant: String = "",
         currentTime: Long = System.currentTimeMillis()
     ): Boolean {
         // Purge expired records older than the deduplication window
@@ -38,7 +40,8 @@ object TransactionDeduplicator {
             }
         }
 
-        val key = "${type.uppercase(Locale.US)}_${String.format(Locale.US, "%.2f", amount)}"
+        val normalizedMerchant = merchant.trim().lowercase(Locale.US)
+        val key = "${type.uppercase(Locale.US)}_${String.format(Locale.US, "%.2f", amount)}_$normalizedMerchant"
         val lastSeen = recentTransactions[key]
         if (lastSeen != null && (currentTime - lastSeen) <= DEDUP_WINDOW_MILLIS) {
             return true
@@ -60,46 +63,25 @@ object TransactionDeduplicator {
  */
 object TransactionNotificationParser {
 
-    // Known financial & messaging package prefixes or names
-    private val SUPPORTED_PACKAGES = setOf(
-        // SMS & RCS Apps
-        "com.google.android.apps.messaging",
-        "com.android.mms",
-        "com.samsung.android.messaging",
-        "com.oneplus.mms",
-        "com.miui.mms",
-        "com.coloros.mms",
-        "com.vivo.mms",
-        // Indian UPI & Wallets
-        "com.google.android.apps.nbu.paisa.user", // Google Pay India
-        "com.phonepe.app",                       // PhonePe
-        "net.one97.paytm",                        // Paytm
-        "in.org.npci.upiapp",                     // BHIM
-        "in.amazon.mShop.android.shopping",       // Amazon India
-        // International Payment Apps & Digital Banks
-        "com.venmo",
-        "com.squareup.cash",                      // Cash App
-        "com.paypal.android.p2pmobile",           // PayPal
-        "com.zellepay.zelle",                     // Zelle
-        "com.revolut.revolut",                    // Revolut
-        "com.transferwise.android",               // Wise
-        "com.monzo.android",                      // Monzo
-        "com.starlingbank.android",               // Starling Bank
-        "com.chime.app",                          // Chime
-        "com.apple.android.wallet",
-        "com.google.android.apps.walletnfcrel"    // Google Wallet
+    private const val SELF_PACKAGE = "com.waleed.vaulta.android"
+
+    // Strict Noise & Scam Filter:
+    // Notice: Disclaimers like "Bank never asks for OTP" or "Do not share OTP" are NOT treated as OTP prompts!
+    // Only real OTP/auth challenges or failed/declined transactions are filtered.
+    private val OTP_PROMPT_REGEX = Regex(
+        """(?i)\b(?:is\s+your\s+otp|otp\s+is\s*:?\s*\d+|\byour\s+otp\s+(?:for|is)\b|\buse\s+(?:the\s+)?otp\s+\d+|\bone[- ]time\s+password\s+is\b|\bverification\s+code\s+is\s*:?\s*\d+|\buse\s+code\s+\d+\s+to\b|\blogin\s+otp\b|\botp\s+to\s+verify\b|\benter\s+otp\b|\bsecret\s+code\s+is\b)"""
     )
 
-    // Strict Noise & Scam Filter: OTPs, 2FA, Failed, Declined, Requests, and Promos
-    private val NOISE_PATTERNS = listOf(
-        // OTPs & Auth codes
-        Regex("""(?i)\b(otp|one[- ]time password|verification code|security code|2fa|do not share|secret code)\b"""),
-        // Failed / Declined / Reversals
-        Regex("""(?i)\b(failed|declined|unsuccessful|reversed due to failure|insufficient funds|cancelled|canceled|transaction rejected|payment failed)\b"""),
-        // Incoming payment requests / mandates
-        Regex("""(?i)\b(requested|has requested|collect request|payment request|autopay mandate created|mandate registered|request received)\b"""),
-        // Marketing & Promotional
-        Regex("""(?i)\b(win up to|flat \d+% off|pre[- ]approved loan|apply now|voucher|cashback of up to|congratulations you won|claim your|special offer)\b""")
+    private val FAILED_TRANSACTION_REGEX = Regex(
+        """(?i)\b(?:(?:transaction|payment|transfer|order)\s+(?:has\s+)?(?:failed|declined|cancelled|canceled|rejected)|(?:failed|declined|unsuccessful|rejected)\s+(?:to\s+debit|to\s+credit|transaction|payment|transfer)|insufficient\s+(?:funds|balance)|payment\s+(?:of\s+.*?\s+)?(?:failed|declined|unsuccessful)|(?:transaction|payment)\s+reversed\s+due\s+to\s+failure)\b"""
+    )
+
+    private val REQUEST_OR_MANDATE_REGEX = Regex(
+        """(?i)\b(?:has\s+requested|requested\s+(?:money|payment|[₹$€£]|rs\.?|inr|usd)|collect\s+request|payment\s+request|autopay\s+mandate\s+created|mandate\s+registered|request\s+received)\b"""
+    )
+
+    private val PROMO_REGEX = Regex(
+        """(?i)\b(?:win\s+up\s+to|flat\s+\d+%\s+off|pre[- ]approved\s+loan|apply\s+now|claim\s+your|special\s+offer|congratulations\s+you\s+won)\b"""
     )
 
     // Keywords that indicate banking or payment context
@@ -107,27 +89,34 @@ object TransactionNotificationParser {
         "debited", "debit", "credited", "credit", "paid", "spent", "received", "transferred",
         "transfer to", "transfer from", "withdrawn", "withdrawal", "deposit", "deposited",
         "charged", "charge", "refund", "refunded", "cashback", "salary", "payout", "pos txn",
-        "card ending", "a/c", "acct", "account", "bank", "upi", "vpa", "avl bal", "available balance"
+        "card ending", "a/c", "acct", "account", "bank", "upi", "vpa", "avl bal", "available balance",
+        "sent to", "sent", "payment", "txn", "inr", "rs.", "rs ", "₹"
     )
 
     // Expense indicators
     private val EXPENSE_REGEX = Regex(
-        """(?i)\b(debited|debit|paid|sent|spent|withdrawn|withdrawal|purchased|purchase|charged|charge|payment of|payment to|transfer to|transferred to|pos txn|atm|sent to|you paid|you sent)\b"""
+        """(?i)\b(debited|debit|paid|sent|spent|withdrawn|withdrawal|purchased|purchase|charged|charge|payment of|payment to|transfer to|transferred to|pos txn|atm|sent to|you paid|you sent|debited by|debited with|debited for)\b"""
     )
 
     // Income indicators
     private val INCOME_REGEX = Regex(
-        """(?i)\b(credited|credit|received|deposited|deposit|refund|refunded|cashback|salary|payout|transfer from|transferred from|received from|you received)\b"""
+        """(?i)\b(credited|credit|received|deposited|deposit|refund|refunded|cashback|salary|payout|transfer from|transferred from|received from|you received|credited with|credited by|credited for|deposited in|deposited into)\b"""
     )
 
-    // Balances & card/account numbers to strip before amount search
+    // Balances to strip before amount search so available balances are not mistaken for transaction amounts
     private val BALANCE_REGEX = Regex(
-        """(?i)\b(?:(?:total|available|avl\.?)\s+)*bal(?:ance)?\b.*?(?:([₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*(\d[\d,.]*)|\b(\d[\d,.]*)\s*([₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY))""",
+        """(?i)\b(?:(?:total|available|avl\.?)\s+)*(?:bal(?:ance)?|a/c\s+bal)\s*(?:is|:|=|-|\s)\s*(?:([₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*([\d,.]+)|([\d,.]+)\s*([₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY))""",
         RegexOption.IGNORE_CASE
     )
 
+    private val BALANCE_SIMPLE_REGEX = Regex(
+        """(?i)\b(?:avl\.?\s*bal(?:ance)?|bal(?:ance)?)\s*[:=]\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)?\s*[\d,.]+""",
+        RegexOption.IGNORE_CASE
+    )
+
+    // Account & card references to strip
     private val ACCOUNT_CARD_REGEX = Regex(
-        """(?i)\b(?:a/c(?:\s*no\.?)?|account(?:\s*no\.?)?|card(?:\s*ending(?:\s*in)?)?)\s*(?:[*xX\d]+)""",
+        """(?i)\b(?:a/c(?:\s*no\.?)?|acct(?:\s*no\.?)?|account(?:\s*no\.?)?|card(?:\s*ending(?:\s*in)?)?)\s*(?:[*xX\d]+)""",
         RegexOption.IGNORE_CASE
     )
 
@@ -138,7 +127,7 @@ object TransactionNotificationParser {
     )
 
     /**
-     * Parses a notification from its package, title, and body text.
+     * Parses a notification from its package, title, and body text fields.
      * Returns a valid [ParsedTransaction] or null if the notification is not a completed financial transaction.
      */
     fun parse(
@@ -146,33 +135,36 @@ object TransactionNotificationParser {
         title: String,
         text: String,
         bigText: String? = null,
+        subText: String? = null,
+        textLines: String? = null,
         postTime: Long = System.currentTimeMillis()
     ): ParsedTransaction? {
-        val fullBody = if (!bigText.isNullOrBlank() && bigText.length > text.length) bigText else text
+        if (packageName == SELF_PACKAGE) return null
+
+        // Collect all available text sources
+        val bodyParts = listOfNotNull(bigText, textLines, text, subText)
+            .filter { it.isNotBlank() }
+            .distinct()
+        val fullBody = if (bodyParts.isNotEmpty()) bodyParts.joinToString(" ") else text
         val combinedText = "$title $fullBody".trim()
 
         if (combinedText.isBlank()) return null
 
-        // 1. Package source check & financial intent verification
-        val isKnownPackage = SUPPORTED_PACKAGES.contains(packageName) ||
-                packageName.contains("messaging", ignoreCase = true) ||
-                packageName.contains(".mms", ignoreCase = true) ||
-                packageName.contains(".sms", ignoreCase = true)
-
-        val hasFinancialKeywords = FINANCIAL_KEYWORDS.any { combinedText.contains(it, ignoreCase = true) }
-
-        if (!isKnownPackage && !hasFinancialKeywords) {
+        // 1. Noise, scam, OTP, and failure filtering
+        if (OTP_PROMPT_REGEX.containsMatchIn(combinedText)) {
+            return null
+        }
+        if (FAILED_TRANSACTION_REGEX.containsMatchIn(combinedText)) {
+            return null
+        }
+        if (REQUEST_OR_MANDATE_REGEX.containsMatchIn(combinedText)) {
+            return null
+        }
+        if (PROMO_REGEX.containsMatchIn(combinedText)) {
             return null
         }
 
-        // 2. Strict noise, scam, OTP, and failure filtering
-        for (pattern in NOISE_PATTERNS) {
-            if (pattern.containsMatchIn(combinedText)) {
-                return null
-            }
-        }
-
-        // 3. Classify transaction type (Income vs Expense)
+        // 2. Classify transaction type (Income vs Expense)
         val hasIncome = INCOME_REGEX.containsMatchIn(combinedText)
         val hasExpense = EXPENSE_REGEX.containsMatchIn(combinedText)
 
@@ -180,12 +172,11 @@ object TransactionNotificationParser {
             return null
         }
 
-        // Priority resolution: if both words appear (e.g. "debited ... refund" vs "credited ... paid")
+        // Priority resolution: if both words appear
         val type = when {
             hasIncome && !hasExpense -> "Income"
             hasExpense && !hasIncome -> "Expense"
             else -> {
-                // Determine which verb appears earlier or matches specific keywords
                 val incomeMatch = INCOME_REGEX.find(combinedText)
                 val expenseMatch = EXPENSE_REGEX.find(combinedText)
                 if (incomeMatch != null && expenseMatch != null) {
@@ -198,12 +189,13 @@ object TransactionNotificationParser {
             }
         }
 
-        // 4. Clean text by removing balances & card/account numbers so they aren't parsed as amounts
+        // 3. Clean text by removing balances & card/account numbers so they aren't parsed as transaction amounts
         val strippedText = combinedText
             .replace(BALANCE_REGEX, " ")
+            .replace(BALANCE_SIMPLE_REGEX, " ")
             .replace(ACCOUNT_CARD_REGEX, " ")
 
-        // 5. Extract amount and currency
+        // 4. Extract amount and currency
         val amountMatch = AMOUNT_PATTERN.find(strippedText) ?: return null
 
         val rawCurrency = (amountMatch.groups[1]?.value ?: amountMatch.groups[4]?.value ?: "").trim()
@@ -214,7 +206,7 @@ object TransactionNotificationParser {
 
         val (currencyCode, currencySymbol) = normalizeCurrency(rawCurrency)
 
-        // 6. Extract merchant / payee name and determine category
+        // 5. Extract merchant / payee name and determine category
         val rawMerchant = extractMerchant(title, fullBody, packageName)
         val category = mapCategory(rawMerchant, combinedText, type)
 
@@ -289,33 +281,30 @@ object TransactionNotificationParser {
      * Extracts merchant or sender name from notification title/body using financial regex rules.
      */
     private fun extractMerchant(title: String, body: String, packageName: String): String? {
-        // App-specific title handling:
-        // In GPay, PhonePe, Paytm, Venmo, Cash App, PayPal, the title is often the Merchant/Payee name!
         val appNames = listOf(
             "google pay", "phonepe", "paytm", "bhim", "paypal", "venmo", "cash app",
-            "zelle", "revolut", "wise", "monzo", "apple pay", "wallet", "messages", "sms"
+            "zelle", "revolut", "wise", "monzo", "apple pay", "wallet", "messages", "sms",
+            "message", "messaging"
         )
         val titleIsAppName = appNames.any { title.contains(it, ignoreCase = true) }
 
         val candidatePatterns = listOf(
-            // "<Sender> deposited in your <Bank> account" e.g. "NAVI LIMITED Deposited IN YOUR ICICI BANK Account"
+            // "Info: <Merchant>" e.g. Info: UPI/Uber or Info: Amazon Retail
+            Regex("""(?i)\b(?:info:?|ref:?)\s*([A-Za-z0-9\s&'’\.\-_/]+?)(?:\s*\.|\s+Total|\s+Avl|\s+Bal|$)"""),
+            // "VPA <upi_id>"
+            Regex("""(?i)\b(?:vpa)\s+([A-Za-z0-9\.\-_@]+)"""),
+            // "<Sender> deposited in your <Bank> account"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?deposited\s+(?:in|into|to)\s+(?:your\s+)?([A-Za-z0-9\s]+?)(?:account|a/c|\.|$)"""),
             // "<Sender> has sent / transferred / credited"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:sent|transferred|credited)\s+(?:to|in|into)\s+(?:your\s+)?([A-Za-z0-9\s]+?)(?:account|a/c|\.|$)"""),
-            // "paid ... to <Merchant>" / "payment of ... to <Merchant>" / "sent ... to <Merchant>"
+            // "paid ... to/at <Merchant>" / "sent ... to <Merchant>" / "payment of ... to <Merchant>"
             Regex("""(?i)\b(?:paid|sent|spent|payment|transfer|transferred)\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "received ... from <Sender>" / "credited ... by <Sender>"
+            // "received ... from/by <Sender>" / "credited ... by/from <Sender>"
             Regex("""(?i)\b(?:received|credited|deposit|deposited)\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:from|by)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "to <Merchant>"
-            Regex("""(?i)\b(?:to)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "at <Merchant>"
-            Regex("""(?i)\b(?:at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+with|\s+using|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "to/at <Merchant>"
+            Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "from <Sender>"
-            Regex("""(?i)\b(?:from)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "Info: <Merchant>" e.g. Info: UPI/Uber or Info: Amazon
-            Regex("""(?i)\b(?:info:?)\s*([A-Za-z0-9\s&'’\.\-_/]+?)(?:\s*\.|\s+Total|\s+Avl|$)"""),
-            // "VPA <upi_id>"
-            Regex("""(?i)\b(?:vpa)\s+([A-Za-z0-9\.\-_@]+)""")
+            Regex("""(?i)\b(?:from|by)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)""")
         )
 
         val fullText = "$title $body"
@@ -354,6 +343,16 @@ object TransactionNotificationParser {
             return "UPI Transfer ($digits)"
         }
 
+        // If candidate is a date format like "22-Nov-26" or "22/11/2026", discard
+        if (trimmed.matches(Regex("""(?i)^\d{1,2}[-/\s](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2})[-/\s]\d{2,4}$"""))) {
+            return ""
+        }
+
+        // If candidate is simply an account or card label, discard
+        if (trimmed.matches(Regex("""(?i)^(?:a/c|acct|account|card)\s*[*xX\d]*$"""))) {
+            return ""
+        }
+
         // 2. Strip banking boilerplate phrases
         var stripped = trimmed
             .replace(Regex("""(?i)\b(?:deposited\s+in|deposited\s+into|credited\s+to|debited\s+from|transferred\s+to|spent\s+on)\s+(?:your\s+)?[A-Za-z0-9\s]+?(?:account|a/c|card|bank)\b.*$"""), "")
@@ -365,15 +364,15 @@ object TransactionNotificationParser {
             .trim()
 
         // If stripped is empty or just generic word
-        if (stripped.isBlank() || stripped.equals("Deposited", ignoreCase = true) || stripped.equals("Credited", ignoreCase = true)) {
+        if (stripped.isBlank() || stripped.equals("Deposited", ignoreCase = true) || stripped.equals("Credited", ignoreCase = true) || stripped.equals("Debited", ignoreCase = true)) {
             val upperName = name.uppercase(Locale.US)
             return when {
-                upperName.contains("ICICI") -> "ICICI Bank Deposit"
-                upperName.contains("HDFC") -> "HDFC Bank Deposit"
-                upperName.contains("SBI") -> "SBI Deposit"
-                upperName.contains("AXIS") -> "Axis Bank Deposit"
-                upperName.contains("KOTAK") -> "Kotak Bank Deposit"
-                upperName.contains("PAYTM") -> "Paytm Deposit"
+                upperName.contains("ICICI") -> "ICICI Bank"
+                upperName.contains("HDFC") -> "HDFC Bank"
+                upperName.contains("SBI") -> "SBI"
+                upperName.contains("AXIS") -> "Axis Bank"
+                upperName.contains("KOTAK") -> "Kotak Bank"
+                upperName.contains("PAYTM") -> "Paytm"
                 else -> ""
             }
         }
