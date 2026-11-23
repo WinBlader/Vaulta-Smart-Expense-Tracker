@@ -462,8 +462,133 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 7. 8-Second Tight Deduplication Engine Tests
+    // 7. Deduplication & Contradictory Credit/Debit Suppression Tests
     // ============================================================
+
+    @Test
+    fun testIncomingP2pTransferPaidYouIsClassifiedAsIncomeAndCleansTitle() {
+        // Notification 1: UPI app alert where body is "AJAZ Ahmad WANI paid you ₹101.00"
+        val res1 = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = "AJAZ Ahmad WANI paid you ₹101.00"
+        )
+        assertNotNull(res1)
+        assertEquals("Income", res1!!.type)
+        assertEquals(101.0, res1.amount, 0.01)
+        assertTrue(res1.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+        assertFalse(res1.title.contains("paid you", ignoreCase = true))
+
+        // Notification 2: UPI app alert where title has redundant "Paid You 101.00"
+        val res2 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.nbu.paisa.user",
+            title = "AJAZ Ahmad WANI Paid You 101.00",
+            text = "AJAZ Ahmad WANI paid you 101.00"
+        )
+        assertNotNull(res2)
+        assertEquals("Income", res2!!.type)
+        assertEquals(101.0, res2.amount, 0.01)
+        assertTrue(res2.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+        assertFalse(res2.title.contains("paid you", ignoreCase = true))
+    }
+
+    @Test
+    fun testIncomingP2pSentYouAndReceivedFromClassifiedAsIncome() {
+        val res1 = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = "AJAZ Ahmad WANI sent you Rs. 101.00"
+        )
+        assertNotNull(res1)
+        assertEquals("Income", res1!!.type)
+        assertEquals(101.0, res1.amount, 0.01)
+        assertTrue(res1.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+
+        val res2 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Bank Alert",
+            text = "Received Rs. 101.00 from AJAZ Ahmad WANI on 23-Nov-26. Avl Bal: Rs 5,000.00"
+        )
+        assertNotNull(res2)
+        assertEquals("Income", res2!!.type)
+        assertEquals(101.0, res2.amount, 0.01)
+        assertTrue(res2.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+
+        val res3 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "SBI",
+            text = "Rs. 101.00 credited to your account XX1234 by transfer from AJAZ Ahmad WANI"
+        )
+        assertNotNull(res3)
+        assertEquals("Income", res3!!.type)
+        assertEquals(101.0, res3.amount, 0.01)
+        assertTrue(res3.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+    }
+
+    @Test
+    fun testOutgoingDebitSentToAndPaidToClassifiedAsExpense() {
+        val res1 = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = "Paid Rs. 101.00 to AJAZ Ahmad WANI"
+        )
+        assertNotNull(res1)
+        assertEquals("Expense", res1!!.type)
+        assertEquals(101.0, res1.amount, 0.01)
+        assertTrue(res1.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+
+        val res2 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.nbu.paisa.user",
+            title = "Google Pay",
+            text = "You paid Rs. 101.00 to AJAZ Ahmad WANI"
+        )
+        assertNotNull(res2)
+        assertEquals("Expense", res2!!.type)
+        assertEquals(101.0, res2.amount, 0.01)
+
+        val res3 = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = "Sent Rs. 101.00 to AJAZ Ahmad WANI"
+        )
+        assertNotNull(res3)
+        assertEquals("Expense", res3!!.type)
+        assertEquals(101.0, res3.amount, 0.01)
+
+        val res4 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "HDFC Bank",
+            text = "Rs. 101.00 debited from A/c XX1234 to AJAZ Ahmad WANI on 23-Nov-26"
+        )
+        assertNotNull(res4)
+        assertEquals("Expense", res4!!.type)
+        assertEquals(101.0, res4.amount, 0.01)
+    }
+
+    @Test
+    fun testContradictoryCreditAndDebitDeduplicationWithinWindow() {
+        val now = 1000000000L
+
+        // 1. First event: Bank SMS informs Income ₹101 from AJAZ Ahmad WANI
+        val isFirstDuplicate = TransactionDeduplicator.isDuplicate(101.0, "Income", "AJAZ Ahmad WANI", now)
+        assertFalse(isFirstDuplicate)
+
+        // 2. Second event: Near-simultaneous push alert arrives 2s later
+        val isDuplicateIncome = TransactionDeduplicator.isDuplicate(101.0, "Income", "AJAZ Ahmad WANI", now + 2_000L)
+        assertTrue(isDuplicateIncome)
+
+        // 3. Third event: Contradictory entry (Expense ₹101 for same person within 25s) is rejected
+        val isContradictoryExpense = TransactionDeduplicator.isDuplicate(101.0, "Expense", "AJAZ Ahmad WANI", now + 4_000L)
+        assertTrue(isContradictoryExpense)
+
+        // 4. Different merchant for the same amount ₹101 is NOT duplicate
+        val isDifferentMerchantDuplicate = TransactionDeduplicator.isDuplicate(101.0, "Expense", "Zomato", now + 6_000L)
+        assertFalse(isDifferentMerchantDuplicate)
+
+        // 5. Same AJAZ Ahmad WANI after the 25-second window (> 25_000ms) is allowed
+        val isAfterWindowDuplicate = TransactionDeduplicator.isDuplicate(101.0, "Income", "AJAZ Ahmad WANI", now + 26_000L)
+        assertFalse(isAfterWindowDuplicate)
+    }
 
     @Test
     fun testTightDeduplicationEngine() {
@@ -481,8 +606,8 @@ class TransactionNotificationParserTest {
         val isDifferentMerchantDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Chai Point", now + 5_000L)
         assertFalse(isDifferentMerchantDuplicate)
 
-        // Fourth notification: Same Swiggy Rs 250, but 10 seconds later (> 8s window) -> NOT a duplicate!
-        val isAfterWindowDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now + 10_000L)
+        // Fourth notification: Same Swiggy Rs 250, but 30 seconds later (> 25s window) -> NOT a duplicate!
+        val isAfterWindowDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now + 30_000L)
         assertFalse(isAfterWindowDuplicate)
     }
 }

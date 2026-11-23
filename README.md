@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.0%20(Build%206)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.0"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.1%20(Build%207)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.1"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -81,7 +81,8 @@
 - **Multi-Currency Parser:** Extracts amounts in global formats and currencies (`₹`, `Rs.`, `$`, `USD`, `€`, `EUR`, `£`, `GBP`, `AED`, `SAR`, etc.) including European comma formats (`€19,99`).
 - **100% Local & Private:** Evaluated strictly on-device in memory. Raw notification text is **never saved, logged, or uploaded** to the cloud.
 - **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
-- **Deduplication Engine:** 2-minute rolling time window prevents double-logging when Bank SMS and UPI push notifications trigger simultaneously.
+- **Intelligent Deduplication & Direction Protection:** 25-second rolling window prevents duplicate entries across simultaneous SMS and push alerts, and guarantees that incoming credit alerts (e.g. "X paid you", "sent you", "received from", "credited") are strictly classified as Income and never produce duplicate or contradictory Expense rows.
+- **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"AJAZ Ahmad WANI Paid You 101.00"` to `"AJAZ Ahmad WANI"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
 
 ### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
 - **Swipe-to-Delete:** Effortlessly dismiss any transaction from the Home feed or the full Transaction List using Material 3 `SwipeToDismissBox` with custom red warning backgrounds and trash icons.
@@ -207,7 +208,7 @@ Vaulta/
 │   │   │   │   └── Vaulta.kt                # Application class (@HiltAndroidApp)
 │   │   │   └── res/                         # Vector drawables, mipmaps, string resources
 │   │   └── test/                            # Unit and instrumentation tests
-│   ├── build.gradle.kts                     # App module build configuration (v1.4.0)
+│   ├── build.gradle.kts                     # App module build configuration (v1.4.1)
 │   └── proguard-rules.pro                   # ProGuard / R8 rules
 ├── screenshots/                             # High-resolution application screenshots
 ├── PRIVACY_POLICY.md                        # Official Privacy Policy

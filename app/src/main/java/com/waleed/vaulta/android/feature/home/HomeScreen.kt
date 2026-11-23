@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -632,36 +634,45 @@ fun TransactionItem(
     color: Color,
     modifier: Modifier
 ) {
-
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painter = painterResource(id = icon),
-                contentDescription = null,
-                modifier = Modifier.size(51.dp)
+        Image(
+            painter = painterResource(id = icon),
+            contentDescription = null,
+            modifier = Modifier.size(51.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            ExpenseTextView(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.size(8.dp))
-            Column {
-                ExpenseTextView(
-                    text = title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.size(6.dp))
-                ExpenseTextView(text = date, fontSize = 13.sp, color = LightGrey)
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            ExpenseTextView(
+                text = date,
+                fontSize = 13.sp,
+                color = LightGrey,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         ExpenseTextView(
             text = amount,
             fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.align(Alignment.CenterEnd),
-            color = color
+            color = color,
+            maxLines = 1
         )
     }
 }

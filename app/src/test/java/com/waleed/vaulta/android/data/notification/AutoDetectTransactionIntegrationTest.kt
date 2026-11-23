@@ -129,4 +129,37 @@ class AutoDetectTransactionIntegrationTest {
         assertEquals("Income", updatedList.first().type)
         assertEquals(5000.0, updatedList.first().amount, 0.01)
     }
+
+    @Test
+    fun testIncomingP2pPaidYouFlow() = runBlocking {
+        val fakeRepository = FakeExpenseRepository()
+
+        val rawNotification = "AJAZ Ahmad WANI paid you ₹101.00"
+        val parsed = TransactionNotificationParser.parse(
+            packageName = "com.phonepe.app",
+            title = "PhonePe",
+            text = rawNotification
+        )
+        assertNotNull(parsed)
+        assertEquals("Income", parsed!!.type)
+        assertEquals(101.0, parsed.amount, 0.01)
+        assertTrue(parsed.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+
+        val autoDetectedEntity = ExpenseEntity(
+            id = null,
+            title = parsed.title,
+            amount = parsed.amount,
+            date = Utils.formatDateToHumanReadableForm(parsed.timestamp),
+            type = parsed.type,
+            userId = "test_user_key"
+        )
+        val inserted = fakeRepository.insertExpense(autoDetectedEntity)
+        assertTrue(inserted)
+
+        val updated = fakeRepository.getAllExpenses().first()
+        assertEquals(1, updated.size)
+        assertEquals("Income", updated.first().type)
+        assertEquals(101.0, updated.first().amount, 0.01)
+        assertTrue(updated.first().title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+    }
 }

@@ -191,8 +191,15 @@ class VaultaNotificationListenerService : NotificationListenerService() {
                     CurrencyManager.setCurrencyByCode(parsed.currencyCode)
                 }
 
-                // Clean title without raw currency code brackets
-                val displayTitle = parsed.title.replace(Regex("""(?i)\s*\[[A-Z]{3}\]"""), "").trim()
+                // Clean title without raw currency code brackets or redundant "Paid You" phrases
+                var displayTitle = parsed.title.replace(Regex("""(?i)\s*\[[A-Z]{3}\]"""), "").trim()
+                displayTitle = displayTitle
+                    .replace(Regex("""(?i)\s+(?:has\s+)?(?:paid|sent|transferred)\s+you(?:\s+(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)?\s*[\d,.]+)?.*$"""), "")
+                    .replace(Regex("""(?i)\s+(?:has\s+)?(?:paid|sent|transferred)\s+you.*$"""), "")
+                    .trim()
+                if (displayTitle.isBlank()) {
+                    displayTitle = if (parsed.type == "Income") "Income" else "Expense"
+                }
 
                 val expense = ExpenseEntity(
                     id = null,
