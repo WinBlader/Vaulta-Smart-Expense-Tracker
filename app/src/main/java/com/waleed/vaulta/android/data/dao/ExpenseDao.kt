@@ -13,23 +13,29 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ExpenseDao {
 
-    @Query("SELECT * FROM expense_table WHERE userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail) ORDER BY id DESC")
+    @Query("SELECT * FROM expense_table WHERE userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail))) ORDER BY id DESC")
     fun getAllExpenseForUser(userId: String, fallbackEmail: String = ""): Flow<List<ExpenseEntity>>
 
-    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail)) AND type = 'Expense' ORDER BY amount DESC LIMIT 5")
+    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)))) AND type = 'Expense' ORDER BY amount DESC LIMIT 5")
     fun getTopExpensesForUser(userId: String, fallbackEmail: String = ""): Flow<List<ExpenseEntity>>
 
-    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail)) AND type = 'Income' ORDER BY amount DESC LIMIT 5")
+    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)))) AND type = 'Income' ORDER BY amount DESC LIMIT 5")
     fun getTopIncomesForUser(userId: String, fallbackEmail: String = ""): Flow<List<ExpenseEntity>>
 
-    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail)) AND (type = 'Owed to You' OR type = 'You Owe' OR type = 'Credit' OR type = 'Owe') ORDER BY amount DESC LIMIT 5")
+    @Query("SELECT * FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)))) AND (type = 'Owed to You' OR type = 'You Owe' OR type = 'Credit' OR type = 'Owe') ORDER BY amount DESC LIMIT 5")
     fun getTopCreditOweForUser(userId: String, fallbackEmail: String = ""): Flow<List<ExpenseEntity>>
 
-    @Query("SELECT type, date, SUM(amount) AS total_amount FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail)) AND type = :type GROUP BY type, date ORDER BY date")
+    @Query("SELECT type, date, SUM(amount) AS total_amount FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)))) AND type = :type GROUP BY type, date ORDER BY date")
     fun getAllExpenseByDateForUser(type: String = "Expense", userId: String, fallbackEmail: String = ""): Flow<List<ExpenseSummary>>
 
-    @Query("SELECT type, date, SUM(amount) AS total_amount FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND userId = :fallbackEmail)) AND (type = 'Owed to You' OR type = 'You Owe' OR type = 'Credit' OR type = 'Owe') GROUP BY type, date ORDER BY date")
+    @Query("SELECT type, date, SUM(amount) AS total_amount FROM expense_table WHERE (userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)))) AND (type = 'Owed to You' OR type = 'You Owe' OR type = 'Credit' OR type = 'Owe') GROUP BY type, date ORDER BY date")
     fun getCreditOweExpenseByDateForUser(userId: String, fallbackEmail: String = ""): Flow<List<ExpenseSummary>>
+
+    @Query("SELECT * FROM expense_table WHERE userId = :userId OR (:fallbackEmail != '' AND :fallbackEmail != 'guest' AND (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail))) ORDER BY id DESC")
+    suspend fun getExpensesListForUser(userId: String, fallbackEmail: String = ""): List<ExpenseEntity>
+
+    @Query("UPDATE expense_table SET userId = :canonicalUserId WHERE (userId = :fallbackEmail OR userId = LOWER(:fallbackEmail)) AND :fallbackEmail != '' AND :fallbackEmail != 'guest' AND :canonicalUserId != '' AND :canonicalUserId != 'guest'")
+    suspend fun migrateLegacyUserRows(canonicalUserId: String, fallbackEmail: String)
 
     // Legacy fallback queries
     @Query("SELECT * FROM expense_table ORDER BY id DESC")

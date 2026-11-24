@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.3%20(Build%209)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.3"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.4%20(Build%2010)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.4"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -274,8 +274,8 @@ Vaulta/
 Vaulta is committed to complete user privacy:
 - **Offline-First by Design:** All financial transactions remain stored locally on your device by default.
 - **Zero Data Monetization:** Vaulta never sells, rents, or shares personal or financial data with third-party advertisers.
-- **Strict Multi-User Isolation:** Each account's data is strictly partitioned by user ID in the local database.
-- **Account Deletion:** Users can purge local cached data anytime by logging out, or request complete account and cloud data deletion.
+- **Strict Multi-User Isolation:** Each account's data is strictly partitioned by user ID in the local database. Transactions, balances, and statistics are safely preserved across sessions and synchronized with Supabase cloud on sign-in.
+- **Account Reset & Deletion:** Users can purge their local data anytime via **Reset Everything** in Profile Settings, or request complete account and cloud data deletion.
 
 For complete details, please read our official [**PRIVACY_POLICY.md**](PRIVACY_POLICY.md).
 

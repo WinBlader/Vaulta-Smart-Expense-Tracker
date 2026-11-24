@@ -50,6 +50,10 @@ class AutoDetectTransactionIntegrationTest {
             return true
         }
 
+        override suspend fun syncUserTransactions() {
+            // no-op in test fake
+        }
+
         override suspend fun clearCurrentUserData() {
             listFlow.value = emptyList()
         }

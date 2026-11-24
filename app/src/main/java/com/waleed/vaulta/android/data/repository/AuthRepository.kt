@@ -78,7 +78,8 @@ class AuthRepositoryImpl @Inject constructor(
     private val supabaseAuthService: SupabaseAuthService,
     private val sessionManager: UserSessionManager,
     private val expenseDao: ExpenseDao,
-    private val budgetManager: BudgetManager
+    private val budgetManager: BudgetManager,
+    private val expenseRepository: ExpenseRepository
 ) : AuthRepository {
 
     override val currentUser: StateFlow<UserProfile?> = sessionManager.currentUser
@@ -93,7 +94,11 @@ class AuthRepositoryImpl @Inject constructor(
         password: String,
         phone: String
     ): Result<SupabaseUser> {
-        return supabaseAuthService.registerWithEmail(username, email, password, phone)
+        val res = supabaseAuthService.registerWithEmail(username, email, password, phone)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun registerWithPhone(
@@ -133,7 +138,11 @@ class AuthRepositoryImpl @Inject constructor(
         email: String,
         password: String
     ): Result<SupabaseUser> {
-        return supabaseAuthService.loginWithEmail(email, password)
+        val res = supabaseAuthService.loginWithEmail(email, password)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun loginWithPhone(
@@ -160,7 +169,7 @@ class AuthRepositoryImpl @Inject constructor(
     ): Result<SupabaseUser> {
         val normalized = PhoneNormalizationUtils.normalizePhone(countryCode, mobileNumber)
         val result = supabaseAuthService.loginWithEmail(normalized.loginEmail, password)
-        return if (result.isSuccess) {
+        val finalResult = if (result.isSuccess) {
             result
         } else {
             // Fallback attempts for backward compatibility with previously stored formats
@@ -173,6 +182,10 @@ class AuthRepositoryImpl @Inject constructor(
                 if (fallback2.isSuccess) fallback2 else result
             }
         }
+        if (finalResult.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return finalResult
     }
 
     override suspend fun loginWithGoogle(
@@ -180,11 +193,15 @@ class AuthRepositoryImpl @Inject constructor(
         email: String,
         phone: String
     ): Result<SupabaseUser> {
-        return supabaseAuthService.signInWithGoogleAccount(
+        val res = supabaseAuthService.signInWithGoogleAccount(
             email = email,
             displayName = name,
             phone = phone
         )
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun sendEmailOtp(email: String): Result<String> {
@@ -192,7 +209,11 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun verifyEmailOtp(email: String, token: String): Result<SupabaseUser> {
-        return supabaseAuthService.verifyEmailOtp(email, token)
+        val res = supabaseAuthService.verifyEmailOtp(email, token)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun sendPhoneOtp(phone: String): Result<String> {
@@ -200,7 +221,11 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun verifyPhoneOtp(phone: String, token: String): Result<SupabaseUser> {
-        return supabaseAuthService.verifyPhoneOtp(phone, token)
+        val res = supabaseAuthService.verifyPhoneOtp(phone, token)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun loginWithGoogleIdToken(
@@ -208,7 +233,11 @@ class AuthRepositoryImpl @Inject constructor(
         displayName: String,
         email: String
     ): Result<SupabaseUser> {
-        return supabaseAuthService.loginWithGoogleIdToken(idToken, displayName, email)
+        val res = supabaseAuthService.loginWithGoogleIdToken(idToken, displayName, email)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun resetPasswordForEmail(email: String): Result<String> {
@@ -218,11 +247,11 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun signOut(): Result<Unit> = withContext(Dispatchers.IO) {
         val userKey = sessionManager.getCurrentUserKey()
         try {
-            // Defense-in-depth: Delete RoomDB cached records for this account on sign-out
-            expenseDao.deleteExpensesForUser(userKey)
+            // Keep local RoomDB records intact across logout so re-logging in restores all transactions.
+            // Reset Everything in Profile is the sole action intended to purge a user's transaction history.
             budgetManager.resetBudgetForUser(userKey)
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepository", "Error cleaning up local user data on sign out", e)
+            android.util.Log.e("AuthRepository", "Error resetting budget on sign out", e)
         }
         return@withContext supabaseAuthService.signOut()
     }
@@ -232,7 +261,11 @@ class AuthRepositoryImpl @Inject constructor(
         displayName: String?,
         phone: String?
     ): Result<SupabaseUser> {
-        return supabaseAuthService.signInWithGoogleAccount(email, displayName, phone)
+        val res = supabaseAuthService.signInWithGoogleAccount(email, displayName, phone)
+        if (res.isSuccess) {
+            expenseRepository.syncUserTransactions()
+        }
+        return res
     }
 
     override suspend fun updateUserProfileCloud(
