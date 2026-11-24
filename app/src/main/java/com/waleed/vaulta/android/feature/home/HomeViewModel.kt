@@ -44,6 +44,18 @@ class HomeViewModel @Inject constructor(
         budgetRepository.checkBalanceAndNotify(list)
     }
 
+    fun insertExpense(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            val success = expenseRepository.insertExpense(expense)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Transaction added successfully",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
     fun updateExpense(expense: ExpenseEntity) {
         viewModelScope.launch {
             val success = expenseRepository.updateExpense(expense)
@@ -111,10 +123,9 @@ class HomeViewModel @Inject constructor(
     fun getBalance(list: List<ExpenseEntity>, currency: CurrencyItem = CurrencyManager.getSelectedCurrency()): String {
         var balance = 0.0
         for (expense in list) {
-            if (expense.type == "Income") {
-                balance += expense.amount
-            } else {
-                balance -= expense.amount
+            when (expense.type) {
+                "Income", "Owed to You", "Credit" -> balance += expense.amount
+                else -> balance -= expense.amount
             }
         }
         return Utils.formatCurrency(balance, currency)

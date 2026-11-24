@@ -165,6 +165,9 @@ fun DataForm(
     val type = remember {
         mutableStateOf(if (isIncome) "Income" else "Expense")
     }
+    val note = remember {
+        mutableStateOf("")
+    }
 
     val presetList = if (isIncome) listOf(
         "Salary",
@@ -405,6 +408,31 @@ fun DataForm(
             )
         }
 
+        Spacer(modifier = Modifier.size(16.dp))
+
+        // Optional Note Field
+        ExpenseTextView(
+            text = "NOTE (OPTIONAL)",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = LightGrey
+        )
+        Spacer(modifier = Modifier.size(6.dp))
+        OutlinedTextField(
+            value = note.value,
+            onValueChange = { note.value = it },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 2,
+            placeholder = {
+                ExpenseTextView(text = "Add a note (optional)", color = LightGrey)
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = androidx.compose.material3.MaterialTheme.colorScheme.outline
+            ),
+            shape = RoundedCornerShape(8.dp)
+        )
+
         Spacer(modifier = Modifier.size(24.dp))
 
         val buttonColor = if (isIncome) Color(0xFF2E7D32) else Color(0xFFD32F2F)
@@ -418,11 +446,12 @@ fun DataForm(
                     if (name.value.isNotBlank() && name.value != "+ Write Custom Title...") name.value else selectedCategory
                 }
                 val model = ExpenseEntity(
-                    null,
-                    finalName,
-                    amount.value.toDoubleOrNull() ?: 0.0,
-                    Utils.formatDateToHumanReadableForm(finalDate),
-                    type.value
+                    id = null,
+                    title = finalName,
+                    amount = amount.value.toDoubleOrNull() ?: 0.0,
+                    date = Utils.formatDateToHumanReadableForm(finalDate),
+                    type = type.value,
+                    note = note.value.trim().ifBlank { null }
                 )
                 onAddExpenseClick(model)
             },

@@ -20,7 +20,10 @@ class AutoDetectTransactionIntegrationTest {
 
         override fun getAllExpenses(): Flow<List<ExpenseEntity>> = listFlow
         override fun getTopExpenses(): Flow<List<ExpenseEntity>> = listFlow
+        override fun getTopIncomes(): Flow<List<ExpenseEntity>> = listFlow
+        override fun getTopCreditOwe(): Flow<List<ExpenseEntity>> = listFlow
         override fun getAllExpenseByDate(type: String): Flow<List<ExpenseSummary>> = MutableStateFlow(emptyList())
+        override fun getCreditOweExpenseByDate(): Flow<List<ExpenseSummary>> = MutableStateFlow(emptyList())
 
         override suspend fun insertExpense(expense: ExpenseEntity): Boolean {
             val current = listFlow.value.toMutableList()

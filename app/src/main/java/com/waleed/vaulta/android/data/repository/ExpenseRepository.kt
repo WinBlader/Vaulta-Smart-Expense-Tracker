@@ -17,7 +17,10 @@ import javax.inject.Singleton
 interface ExpenseRepository {
     fun getAllExpenses(): Flow<List<ExpenseEntity>>
     fun getTopExpenses(): Flow<List<ExpenseEntity>>
+    fun getTopIncomes(): Flow<List<ExpenseEntity>>
+    fun getTopCreditOwe(): Flow<List<ExpenseEntity>>
     fun getAllExpenseByDate(type: String): Flow<List<ExpenseSummary>>
+    fun getCreditOweExpenseByDate(): Flow<List<ExpenseSummary>>
     suspend fun insertExpense(expense: ExpenseEntity): Boolean
     suspend fun updateExpense(expense: ExpenseEntity): Boolean
     suspend fun deleteExpense(expense: ExpenseEntity): Boolean
@@ -33,23 +36,50 @@ class ExpenseRepositoryImpl @Inject constructor(
 ) : ExpenseRepository {
 
     override fun getAllExpenses(): Flow<List<ExpenseEntity>> {
-        return sessionManager.currentUser.flatMapLatest {
+        return sessionManager.currentUser.flatMapLatest { user ->
             val userKey = sessionManager.getCurrentUserKey()
-            dao.getAllExpenseForUser(userKey)
+            val fallbackEmail = user?.email ?: ""
+            dao.getAllExpenseForUser(userKey, fallbackEmail)
         }
     }
 
     override fun getTopExpenses(): Flow<List<ExpenseEntity>> {
-        return sessionManager.currentUser.flatMapLatest {
+        return sessionManager.currentUser.flatMapLatest { user ->
             val userKey = sessionManager.getCurrentUserKey()
-            dao.getTopExpensesForUser(userKey)
+            val fallbackEmail = user?.email ?: ""
+            dao.getTopExpensesForUser(userKey, fallbackEmail)
+        }
+    }
+
+    override fun getTopIncomes(): Flow<List<ExpenseEntity>> {
+        return sessionManager.currentUser.flatMapLatest { user ->
+            val userKey = sessionManager.getCurrentUserKey()
+            val fallbackEmail = user?.email ?: ""
+            dao.getTopIncomesForUser(userKey, fallbackEmail)
+        }
+    }
+
+    override fun getTopCreditOwe(): Flow<List<ExpenseEntity>> {
+        return sessionManager.currentUser.flatMapLatest { user ->
+            val userKey = sessionManager.getCurrentUserKey()
+            val fallbackEmail = user?.email ?: ""
+            dao.getTopCreditOweForUser(userKey, fallbackEmail)
         }
     }
 
     override fun getAllExpenseByDate(type: String): Flow<List<ExpenseSummary>> {
-        return sessionManager.currentUser.flatMapLatest {
+        return sessionManager.currentUser.flatMapLatest { user ->
             val userKey = sessionManager.getCurrentUserKey()
-            dao.getAllExpenseByDateForUser(type, userKey)
+            val fallbackEmail = user?.email ?: ""
+            dao.getAllExpenseByDateForUser(type, userKey, fallbackEmail)
+        }
+    }
+
+    override fun getCreditOweExpenseByDate(): Flow<List<ExpenseSummary>> {
+        return sessionManager.currentUser.flatMapLatest { user ->
+            val userKey = sessionManager.getCurrentUserKey()
+            val fallbackEmail = user?.email ?: ""
+            dao.getCreditOweExpenseByDateForUser(userKey, fallbackEmail)
         }
     }
 

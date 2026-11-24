@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.2%20(Build%208)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.2"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.3%20(Build%209)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.3"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -42,13 +42,21 @@
 
 ## ✨ Key Features 
 
-### 1. 💸 Expense & Income Tracking
-- **Fast Transaction Logging:** Dedicated, distraction-free entry layouts optimized separately for income streams and expenses.
+### 1. 💸 Expense & Income Tracking + Credit & Owe Management
+- **Fast Transaction Logging:** Dedicated, distraction-free entry layouts optimized separately for income streams, expenses, and Credit/Owe obligations.
+- **Credit & Owe FAB Action:** Expandable FAB features a vibrant Amber/Yellow action allowing you to log whether someone owes you money (Credit / Balance `+`) or you owe someone (Owe / Balance `-`).
+- **Optional Transaction Notes:** Add optional descriptive notes to any transaction during creation, edit existing transactions with notes, and view notes in receipts and transaction histories.
 - **Custom Notes & Titles:** Tap the ✏️ pencil tool to record custom merchant or project titles (e.g., *"Freelance Retainer"*, *"Farmers Market"*) while retaining primary category tags.
 - **Rich Category Presets:**
   - *Income:* Salary, Freelance, Investments, Bonus, Rental Income, Gifts & Donations, Other.
   - *Expense:* Groceries, Utilities, Food & Dining, Rent, Healthcare, Transport, Shopping, Entertainment, Subscriptions, Education, Debt.
+  - *Credit & Owe:* Owed to You, You Owe.
 - **Calendar Date Picker:** Built-in Material 3 date dialog allows backdating and accurate transaction record-keeping.
+
+### 2. 📊 Statistics Screen with 3 Dedicated Tabs & Dual Line Graph
+- **Expenses Tab:** View interactive spending graph and "Top Spending" category breakdown.
+- **Income Tab:** View earnings trend graph and matching "Top Earning" breakdown.
+- **Credit / Owe Tab:** View dual dataset line chart featuring **You Owe** in Pink (`#EC4899`) and **Owed to You** in Purple (`#A855F7`) with legend and "Top Credit" breakdown.
 
 ### 2. 🔍 Advanced Filtering & Custom Date Ranges
 - **Instant Keyword Search:** Real-time search bar that filters transactions by title, category, or numerical amount.

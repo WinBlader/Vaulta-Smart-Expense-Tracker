@@ -20,8 +20,10 @@ import javax.inject.Inject
 
 data class ChartData(
     val entries: List<Entry> = emptyList(),
+    val secondaryEntries: List<Entry> = emptyList(), // For Credit/Owe dual chart (You Owe vs Owed to You)
     val labels: List<String> = emptyList(),
-    val totalAmount: Double = 0.0
+    val totalAmount: Double = 0.0,
+    val secondaryTotalAmount: Double = 0.0
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -34,11 +36,20 @@ class StatsViewModel @Inject constructor(
     val selectedType: StateFlow<String> = _selectedType.asStateFlow()
 
     val entries = _selectedType.flatMapLatest { type ->
-        expenseRepository.getAllExpenseByDate(type)
+        if (type == "Credit") {
+            expenseRepository.getCreditOweExpenseByDate()
+        } else {
+            expenseRepository.getAllExpenseByDate(type)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val topEntries: StateFlow<List<ExpenseEntity>> = expenseRepository.getTopExpenses()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val topEntries: StateFlow<List<ExpenseEntity>> = _selectedType.flatMapLatest { type ->
+        when (type) {
+            "Income" -> expenseRepository.getTopIncomes()
+            "Credit" -> expenseRepository.getTopCreditOwe()
+            else -> expenseRepository.getTopExpenses()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onTypeSelected(type: String) {
         _selectedType.value = type
@@ -46,6 +57,43 @@ class StatsViewModel @Inject constructor(
 
     fun getChartData(rawSummaries: List<ExpenseSummary>): ChartData {
         if (rawSummaries.isEmpty()) return ChartData()
+
+        val type = _selectedType.value
+        if (type == "Credit") {
+            // Segregate by type: "You Owe" vs "Owed to You"
+            val oweSummaries = rawSummaries.filter { it.type.equals("You Owe", ignoreCase = true) }
+            val owedSummaries = rawSummaries.filter { it.type.equals("Owed to You", ignoreCase = true) }
+
+            // Collect all unique dates sorted
+            val allDates = rawSummaries.map { it.date }.distinct().sortedBy { Utils.getMillisFromDate(it) }
+            val labels = mutableListOf<String>()
+            val oweEntries = mutableListOf<Entry>()
+            val owedEntries = mutableListOf<Entry>()
+            var totalOwe = 0.0
+            var totalOwed = 0.0
+
+            allDates.forEachIndexed { index, dateStr ->
+                val millis = Utils.getMillisFromDate(dateStr)
+                labels.add(Utils.formatDayMonth(millis))
+
+                val oweAmount = oweSummaries.filter { it.date == dateStr }.sumOf { it.total_amount }
+                val owedAmount = owedSummaries.filter { it.date == dateStr }.sumOf { it.total_amount }
+
+                oweEntries.add(Entry(index.toFloat(), oweAmount.toFloat()))
+                owedEntries.add(Entry(index.toFloat(), owedAmount.toFloat()))
+
+                totalOwe += oweAmount
+                totalOwed += owedAmount
+            }
+
+            return ChartData(
+                entries = oweEntries,
+                secondaryEntries = owedEntries,
+                labels = labels,
+                totalAmount = totalOwe,
+                secondaryTotalAmount = totalOwed
+            )
+        }
 
         // Sort chronologically by timestamp
         val sorted = rawSummaries.sortedBy { Utils.getMillisFromDate(it.date) }

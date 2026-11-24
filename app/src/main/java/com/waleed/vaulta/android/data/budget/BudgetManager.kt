@@ -167,10 +167,9 @@ class BudgetManager @Inject constructor(
         var totalIncome = 0.0
         var totalExpense = 0.0
         for (expense in expenses) {
-            if (expense.type == "Income") {
-                totalIncome += expense.amount
-            } else {
-                totalExpense += expense.amount
+            when (expense.type) {
+                "Income", "Owed to You", "Credit" -> totalIncome += expense.amount
+                else -> totalExpense += expense.amount
             }
         }
         val currentBalance = totalIncome - totalExpense

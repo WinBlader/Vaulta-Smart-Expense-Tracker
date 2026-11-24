@@ -68,10 +68,11 @@ class TransactionListViewModel @Inject constructor(
             }
         }
 
-        // 2. Type Filter (All, Income, Expense)
+        // 2. Type Filter (All, Expense, Income, Credit & Owe)
         val typeFiltered = when (filters.type) {
             "Expense" -> queryFiltered.filter { it.type.equals("Expense", ignoreCase = true) }
             "Income" -> queryFiltered.filter { it.type.equals("Income", ignoreCase = true) }
+            "Credit / Owe" -> queryFiltered.filter { it.type.equals("Owed to You", ignoreCase = true) || it.type.equals("You Owe", ignoreCase = true) }
             else -> queryFiltered
         }
 
@@ -89,10 +90,9 @@ class TransactionListViewModel @Inject constructor(
         var incomeSum = 0.0
         var expenseSum = 0.0
         dateFiltered.forEach { item ->
-            if (item.type.equals("Income", ignoreCase = true)) {
-                incomeSum += item.amount
-            } else {
-                expenseSum += item.amount
+            when (item.type) {
+                "Income", "Owed to You", "Credit" -> incomeSum += item.amount
+                else -> expenseSum += item.amount
             }
         }
         val net = incomeSum - expenseSum

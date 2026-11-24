@@ -535,7 +535,7 @@ fun TransactionListScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = LightGrey
                             )
-                            listOf("All", "Expense", "Income").forEach { type ->
+                            listOf("All", "Expense", "Income", "Credit / Owe").forEach { type ->
                                 val isSelected = uiState.filterType == type
                                 FilterChip(
                                     selected = isSelected,
@@ -810,6 +810,13 @@ fun TransactionListScreen(
                                 ) {
                                     val icon = Utils.getItemIcon(item)
                                     val formattedAmount = Utils.formatCurrency(item.amount, currentCurrency)
+                                    val isIncomeLike = item.type.equals("Income", ignoreCase = true) || item.type.equals("Owed to You", ignoreCase = true)
+                                    val isCreditOwe = item.type.equals("Owed to You", ignoreCase = true) || item.type.equals("You Owe", ignoreCase = true)
+                                    val itemColor = when {
+                                        isCreditOwe -> Color(0xFFF59E0B)
+                                        isIncomeLike -> Green
+                                        else -> Red
+                                    }
 
                                     Box(
                                         modifier = Modifier
@@ -820,10 +827,12 @@ fun TransactionListScreen(
                                     ) {
                                         TransactionItem(
                                             title = item.title,
-                                            amount = if (item.type.equals("Income", ignoreCase = true)) "+$formattedAmount" else "-$formattedAmount",
+                                            amount = if (isIncomeLike) "+$formattedAmount" else "-$formattedAmount",
                                             icon = icon,
                                             date = Utils.formatStringDateToMonthDayYear(item.date),
-                                            color = if (item.type.equals("Income", ignoreCase = true)) Green else Red,
+                                            color = itemColor,
+                                            note = item.note,
+                                            badgeText = if (isCreditOwe) item.type else null,
                                             modifier = Modifier
                                         )
                                     }

@@ -69,9 +69,14 @@ fun TransactionReceiptDialog(
 ) {
     val context = LocalContext.current
     var currentItem by remember(item) { mutableStateOf(item) }
-    val isIncome = currentItem.type.equals("Income", ignoreCase = true)
+    val isIncome = currentItem.type.equals("Income", ignoreCase = true) || currentItem.type.equals("Owed to You", ignoreCase = true)
+    val isCreditOwe = currentItem.type.equals("Owed to You", ignoreCase = true) || currentItem.type.equals("You Owe", ignoreCase = true)
     val amountSign = if (isIncome) "+" else "-"
-    val amountColor = if (isIncome) Green else Red
+    val amountColor = when {
+        isCreditOwe -> Color(0xFFF59E0B)
+        isIncome -> Green
+        else -> Red
+    }
 
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
@@ -231,14 +236,25 @@ fun TransactionReceiptDialog(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     // Type Badge
+                    val badgeBgColor = when {
+                        isCreditOwe -> Color(0xFFF59E0B).copy(alpha = 0.18f)
+                        isIncome -> Green.copy(alpha = 0.18f)
+                        else -> Red.copy(alpha = 0.18f)
+                    }
+                    val badgeLabel = when (currentItem.type) {
+                        "Owed to You" -> "CREDIT (OWED TO YOU)"
+                        "You Owe" -> "OWE (YOU OWE)"
+                        "Income" -> "INCOME / CREDIT"
+                        else -> "EXPENSE / DEBIT"
+                    }
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isIncome) Green.copy(alpha = 0.18f) else Red.copy(alpha = 0.18f))
+                            .background(badgeBgColor)
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = if (isIncome) "INCOME / CREDIT" else "EXPENSE / DEBIT",
+                            text = badgeLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = amountColor
@@ -252,6 +268,9 @@ fun TransactionReceiptDialog(
                     // Detail Rows
                     DetailRow(label = "Date", value = Utils.formatStringDateToMonthDayYear(currentItem.date))
                     DetailRow(label = "Type", value = currentItem.type)
+                    if (!currentItem.note.isNullOrBlank()) {
+                        DetailRow(label = "Note", value = currentItem.note!!)
+                    }
                     DetailRow(label = "Reference ID", value = "VLT-${currentItem.id ?: (System.currentTimeMillis() % 100000)}")
                     DetailRow(label = "Payment Status", value = "Completed • Verified")
                 }

@@ -108,20 +108,36 @@ object CurrencyManager {
         }
     }
 
-    fun hasUserSetCurrency(): Boolean {
+    fun hasUserSetCurrency(userKey: String = ""): Boolean {
+        if (userKey.isNotBlank()) {
+            return sharedPreferences?.contains("${KEY_CURRENCY_CODE}_$userKey") == true ||
+                    sharedPreferences?.contains(KEY_CURRENCY_CODE) == true
+        }
         return sharedPreferences?.contains(KEY_CURRENCY_CODE) == true
     }
 
-    fun setCurrencyByCode(code: String) {
+    fun loadCurrencyForUser(userKey: String = "guest") {
+        val userSpecificCode = sharedPreferences?.getString("${KEY_CURRENCY_CODE}_$userKey", null)
+        val fallbackCode = sharedPreferences?.getString(KEY_CURRENCY_CODE, defaultCurrency.code) ?: defaultCurrency.code
+        val targetCode = userSpecificCode ?: fallbackCode
+        val found = supportedCurrencies.find { it.code.equals(targetCode, ignoreCase = true) } ?: defaultCurrency
+        _selectedCurrency.value = found
+    }
+
+    fun setCurrencyByCode(code: String, userKey: String = "") {
         val found = supportedCurrencies.find { it.code.equals(code, ignoreCase = true) }
         if (found != null) {
-            setCurrency(found)
+            setCurrency(found, userKey)
         }
     }
 
-    fun setCurrency(currency: CurrencyItem) {
+    fun setCurrency(currency: CurrencyItem, userKey: String = "") {
         _selectedCurrency.value = currency
-        sharedPreferences?.edit()?.putString(KEY_CURRENCY_CODE, currency.code)?.apply()
+        val editor = sharedPreferences?.edit()?.putString(KEY_CURRENCY_CODE, currency.code)
+        if (userKey.isNotBlank()) {
+            editor?.putString("${KEY_CURRENCY_CODE}_$userKey", currency.code)
+        }
+        editor?.apply()
     }
 
     fun getSelectedCurrency(): CurrencyItem {

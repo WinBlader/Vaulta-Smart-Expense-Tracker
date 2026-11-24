@@ -73,7 +73,8 @@ fun EditTransactionDialog(
 ) {
     var title by remember { mutableStateOf(item.title) }
     var amount by remember { mutableStateOf(String.format(Locale.US, "%.2f", item.amount)) }
-    var type by remember { mutableStateOf(if (item.type.equals("Income", ignoreCase = true)) "Income" else "Expense") }
+    var type by remember { mutableStateOf(item.type) }
+    var note by remember { mutableStateOf(item.note ?: "") }
     var dateMillis by remember {
         mutableLongStateOf(
             Utils.getMillisFromDate(item.date).let { if (it > 0L) it else System.currentTimeMillis() }
@@ -157,7 +158,7 @@ fun EditTransactionDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Type Toggle (Income vs Expense)
+                // Type Toggle (Expense, Income, Owed to You, You Owe)
                 ExpenseTextView(
                     text = "TRANSACTION TYPE",
                     fontSize = 11.sp,
@@ -168,22 +169,21 @@ fun EditTransactionDialog(
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Expense Button
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(if (type == "Expense") Red.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { type = "Expense" }
-                            .padding(horizontal = 12.dp),
+                            .clickable { type = "Expense" },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "Expense",
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (type == "Expense") FontWeight.Bold else FontWeight.Normal,
                             color = if (type == "Expense") Red else MaterialTheme.colorScheme.onSurface
                         )
@@ -193,18 +193,53 @@ fun EditTransactionDialog(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(if (type == "Income") Green.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { type = "Income" }
-                            .padding(horizontal = 12.dp),
+                            .clickable { type = "Income" },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "Income",
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (type == "Income") FontWeight.Bold else FontWeight.Normal,
                             color = if (type == "Income") Green else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Owed to You
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (type == "Owed to You") Color(0xFFA855F7).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { type = "Owed to You" },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Owed to You",
+                            fontSize = 11.sp,
+                            fontWeight = if (type == "Owed to You") FontWeight.Bold else FontWeight.Normal,
+                            color = if (type == "Owed to You") Color(0xFFA855F7) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // You Owe
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (type == "You Owe") Color(0xFFEC4899).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { type = "You Owe" },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "You Owe",
+                            fontSize = 11.sp,
+                            fontWeight = if (type == "You Owe") FontWeight.Bold else FontWeight.Normal,
+                            color = if (type == "You Owe") Color(0xFFEC4899) else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -324,6 +359,30 @@ fun EditTransactionDialog(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Optional Note Field
+                ExpenseTextView(
+                    text = "NOTE (OPTIONAL)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LightGrey,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 2,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Zinc,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    ),
+                    placeholder = { Text("Add a note (optional)", color = LightGrey, fontSize = 13.sp) }
+                )
+
                 // Error Message
                 if (errorMessage != null) {
                     Spacer(modifier = Modifier.height(10.dp))
@@ -355,7 +414,8 @@ fun EditTransactionDialog(
                             title = cleanTitle,
                             amount = parsedAmount,
                             type = type,
-                            date = Utils.formatDateToHumanReadableForm(dateMillis)
+                            date = Utils.formatDateToHumanReadableForm(dateMillis),
+                            note = note.trim().ifBlank { null }
                         )
                         onSave(updatedEntity)
                     },

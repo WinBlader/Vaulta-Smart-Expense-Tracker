@@ -109,7 +109,18 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     val currentCurrency by com.waleed.vaulta.android.data.CurrencyManager.selectedCurrency.collectAsState()
     val greetingName = userState?.name?.ifEmpty { "User" } ?: "User"
     var showFeedbackDialog by remember { mutableStateOf(false) }
+    var showAddCreditOweDialog by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+
+    if (showAddCreditOweDialog) {
+        AddCreditOweDialog(
+            onDismiss = { showAddCreditOweDialog = false },
+            onSave = {
+                viewModel.insertExpense(it)
+                showAddCreditOweDialog = false
+            }
+        )
+    }
 
     // Receipt Detail, Edit & Share Dialog
     selectedItemForReceipt?.let { item ->
@@ -274,11 +285,18 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                         end.linkTo(parent.end)
                     }, contentAlignment = Alignment.BottomEnd
             ) {
-                MultiFloatingActionButton(modifier = Modifier, {
-                    viewModel.onEvent(HomeUiEvent.OnAddExpenseClicked)
-                }, {
-                    viewModel.onEvent(HomeUiEvent.OnAddIncomeClicked)
-                })
+                MultiFloatingActionButton(
+                    modifier = Modifier,
+                    onAddExpenseClicked = {
+                        viewModel.onEvent(HomeUiEvent.OnAddExpenseClicked)
+                    },
+                    onAddIncomeClicked = {
+                        viewModel.onEvent(HomeUiEvent.OnAddIncomeClicked)
+                    },
+                    onAddCreditOweClicked = {
+                        showAddCreditOweDialog = true
+                    }
+                )
             }
         }
     }
@@ -288,7 +306,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
 fun MultiFloatingActionButton(
     modifier: Modifier,
     onAddExpenseClicked: () -> Unit,
-    onAddIncomeClicked: () -> Unit
+    onAddIncomeClicked: () -> Unit,
+    onAddCreditOweClicked: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -300,11 +319,31 @@ fun MultiFloatingActionButton(
             // Secondary FABs
             AnimatedVisibility(visible = expanded) {
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(16.dp)) {
+                    // Credit / Owe FAB (Yellow)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(color = Color(0xFFF59E0B), shape = RoundedCornerShape(12.dp))
+                            .clickable {
+                                expanded = false
+                                onAddCreditOweClicked.invoke()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_credit_owe),
+                            contentDescription = "Credit & Owe",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                     Box(
                         modifier = Modifier
                             .size(48.dp)
                             .background(color = Color(0xFF2E7D32), shape = RoundedCornerShape(12.dp))
                             .clickable {
+                                expanded = false
                                 onAddIncomeClicked.invoke()
                             },
                         contentAlignment = Alignment.Center
@@ -321,6 +360,7 @@ fun MultiFloatingActionButton(
                             .size(48.dp)
                             .background(color = Color(0xFFD32F2F), shape = RoundedCornerShape(12.dp))
                             .clickable {
+                                expanded = false
                                 onAddExpenseClicked.invoke()
                             },
                         contentAlignment = Alignment.Center
@@ -602,7 +642,14 @@ fun TransactionList(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val icon = Utils.getItemIcon(item)
-                        val amount = if (item.type == "Income") item.amount else item.amount * -1
+                        val isIncomeLike = item.type == "Income" || item.type == "Owed to You" || item.type == "Credit"
+                        val isCreditOwe = item.type == "Owed to You" || item.type == "You Owe"
+                        val amount = if (isIncomeLike) item.amount else item.amount * -1
+                        val itemColor = when {
+                            isCreditOwe -> Color(0xFFF59E0B)
+                            isIncomeLike -> Green
+                            else -> Red
+                        }
 
                         Box(
                             modifier = Modifier
@@ -614,7 +661,9 @@ fun TransactionList(
                                 amount = Utils.formatCurrency(amount, currentCurrency),
                                 icon = icon,
                                 date = Utils.formatStringDateToMonthDayYear(item.date),
-                                color = if (item.type == "Income") Green else Red,
+                                color = itemColor,
+                                note = item.note,
+                                badgeText = if (isCreditOwe) item.type else null,
                                 modifier = Modifier
                             )
                         }
@@ -632,7 +681,9 @@ fun TransactionItem(
     icon: Int,
     date: String,
     color: Color,
-    modifier: Modifier
+    note: String? = null,
+    badgeText: String? = null,
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
@@ -649,15 +700,43 @@ fun TransactionItem(
         Column(
             modifier = Modifier.weight(1f)
         ) {
-            ExpenseTextView(
-                text = title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ExpenseTextView(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (!badgeText.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFF59E0B),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+            if (!note.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                ExpenseTextView(
+                    text = "📝 $note",
+                    fontSize = 12.sp,
+                    color = LightGrey,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
             ExpenseTextView(
                 text = date,
                 fontSize = 13.sp,

@@ -166,13 +166,16 @@ class SupabaseAuthService @Inject constructor(
                 Log.w(TAG, "Could not fetch from profiles table, using user_metadata fallback: ${e.message}")
             }
 
+            val savedProfile = sessionManager.getSavedProfile(email = cleanEmail, id = userId)
             val username = profile?.username?.ifBlank { null }
                 ?: profile?.fullName?.ifBlank { null }
+                ?: savedProfile?.name?.ifBlank { null }
                 ?: currentUser?.userMetadata?.get("username")?.toString()?.trim('"')
                 ?: currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
                 ?: cleanEmail.substringBefore("@")
 
-            val phone = profile?.phoneNumber
+            val phone = profile?.phoneNumber?.ifBlank { null }
+                ?: savedProfile?.phoneNumber?.ifBlank { null }
                 ?: currentUser?.userMetadata?.get("phone_number")?.toString()?.trim('"')
                 ?: currentUser?.phone
                 ?: ""
@@ -331,9 +334,11 @@ class SupabaseAuthService @Inject constructor(
 
             val currentUser = client.auth.currentUserOrNull()
             val userId = currentUser?.id ?: UUID.randomUUID().toString()
+            val savedProfile = sessionManager.getSavedProfile(email = email, id = userId)
             val resolvedEmail = email.ifBlank { currentUser?.email ?: "" }
             val resolvedName = displayName.ifBlank {
-                currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
+                savedProfile?.name?.ifBlank { null }
+                    ?: currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
                     ?: resolvedEmail.substringBefore("@")
             }
 
@@ -382,8 +387,11 @@ class SupabaseAuthService @Inject constructor(
             return@withContext Result.failure(Exception("No Google account selected."))
         }
 
+        val savedProfile = sessionManager.getSavedProfile(email = cleanEmail)
         val resolvedName = if (!displayName.isNullOrBlank()) {
             displayName.trim()
+        } else if (!savedProfile?.name.isNullOrBlank()) {
+            savedProfile!!.name
         } else {
             val localPart = cleanEmail.substringBefore("@")
             localPart.replace(".", " ").replace("_", " ")
@@ -391,7 +399,7 @@ class SupabaseAuthService @Inject constructor(
                 .filter { it.isNotBlank() }
                 .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         }
-        val cleanPhone = phone?.trim() ?: ""
+        val cleanPhone = phone?.trim()?.ifBlank { null } ?: savedProfile?.phoneNumber ?: ""
 
         if (!SupabaseClientProvider.isConfigured()) {
             val user = SupabaseUser(
@@ -676,6 +684,7 @@ class SupabaseAuthService @Inject constructor(
     private fun saveToSession(user: SupabaseUser) {
         sessionManager.saveUser(
             UserProfile(
+                id = user.id,
                 name = user.username,
                 email = user.email,
                 phoneNumber = user.phone,

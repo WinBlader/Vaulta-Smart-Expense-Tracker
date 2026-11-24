@@ -84,20 +84,48 @@ class UserSessionManager @Inject constructor(
     }
 
     fun saveUser(user: UserProfile) {
+        val existing = getSavedProfile(email = user.email, phone = user.phoneNumber, id = user.id)
+        val resolvedId = when {
+            user.id.isNotBlank() && user.id != "guest" -> user.id
+            existing != null && existing.id.isNotBlank() && existing.id != "guest" -> existing.id
+            user.authProvider.contains("Guest", ignoreCase = true) -> "guest"
+            else -> java.util.UUID.randomUUID().toString()
+        }
+
+        // Never overwrite a user-edited display name with an email prefix fallback
+        val resolvedName = when {
+            user.name.isNotBlank() && user.name != user.email.substringBefore("@") -> user.name
+            existing != null && existing.name.isNotBlank() && existing.name != user.email.substringBefore("@") -> existing.name
+            user.name.isNotBlank() -> user.name
+            else -> user.email.substringBefore("@")
+        }
+
+        val resolvedPhone = when {
+            user.phoneNumber.isNotBlank() -> user.phoneNumber
+            existing != null && existing.phoneNumber.isNotBlank() -> existing.phoneNumber
+            else -> ""
+        }
+
+        val toSave = user.copy(
+            id = resolvedId,
+            name = resolvedName,
+            phoneNumber = resolvedPhone
+        )
+
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, true)
-            .putString(KEY_USER_ID, user.id)
-            .putString(KEY_USER_NAME, user.name)
-            .putString(KEY_USER_EMAIL, user.email)
-            .putString(KEY_USER_PHONE, user.phoneNumber)
-            .putString(KEY_AUTH_PROVIDER, user.authProvider)
-            .putBoolean(KEY_IS_VERIFIED, user.isVerified)
-            .putLong(KEY_REGISTERED_AT, user.registeredAt)
+            .putString(KEY_USER_ID, toSave.id)
+            .putString(KEY_USER_NAME, toSave.name)
+            .putString(KEY_USER_EMAIL, toSave.email)
+            .putString(KEY_USER_PHONE, toSave.phoneNumber)
+            .putString(KEY_AUTH_PROVIDER, toSave.authProvider)
+            .putBoolean(KEY_IS_VERIFIED, toSave.isVerified)
+            .putLong(KEY_REGISTERED_AT, toSave.registeredAt)
             .apply()
-        _currentUser.value = user
+        _currentUser.value = toSave
 
         // Persist to registered accounts store
-        saveRegisteredAccount(user)
+        saveRegisteredAccount(toSave)
     }
 
     fun updateUser(name: String, email: String, phoneNumber: String) {
@@ -132,8 +160,8 @@ class UserSessionManager @Inject constructor(
     }
 
     fun logout() {
-        val userKey = getCurrentUserKey()
-        com.waleed.vaulta.android.data.notification.NotificationAccessHelper.resetAutoDetect(context, userKey)
+        // Do NOT reset auto-detect or wipe user settings on sign-out!
+        // Settings remain safely scoped per userId and are restored on next sign-in.
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)
             .remove(KEY_USER_ID)
@@ -235,5 +263,20 @@ class UserSessionManager @Inject constructor(
 
     fun isPhoneRegistered(phone: String): Boolean {
         return findAccountByPhone(phone) != null
+    }
+
+    fun getSavedProfile(email: String = "", phone: String = "", id: String = ""): UserProfile? {
+        val accounts = getAllRegisteredAccounts()
+        if (id.isNotBlank() && id != "guest") {
+            accounts.find { it.id == id }?.let { return it }
+        }
+        if (email.isNotBlank()) {
+            accounts.find { it.email.equals(email.trim(), ignoreCase = true) }?.let { return it }
+        }
+        if (phone.isNotBlank()) {
+            val norm = normalizePhone(phone)
+            accounts.find { normalizePhone(it.phoneNumber) == norm }?.let { return it }
+        }
+        return null
     }
 }
