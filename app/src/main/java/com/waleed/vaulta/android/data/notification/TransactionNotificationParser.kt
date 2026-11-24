@@ -98,6 +98,70 @@ object TransactionNotificationParser {
 
     private const val SELF_PACKAGE = "com.waleed.vaulta.android"
 
+    // Standard SMS / MMS messaging packages across Google, OEM vendors, and trusted SMS organizers
+    val ALLOWED_SMS_PACKAGES = setOf(
+        "com.google.android.apps.messaging",  // Google Messages
+        "com.android.mms",                    // Standard Android / AOSP MMS
+        "com.samsung.android.messaging",      // Samsung Messages
+        "com.miui.mms",                       // Xiaomi / MIUI / HyperOS Messaging
+        "com.android.mms.service",            // MMS Service
+        "com.oneplus.mms",                    // OnePlus SMS
+        "com.oppo.mms",                       // Oppo SMS
+        "com.coloros.mms",                    // ColorOS / Realme SMS
+        "com.vivo.message",                   // Vivo SMS
+        "com.microsoft.android.smsorganizer", // Microsoft SMS Organizer
+        "com.motorola.messaging",             // Motorola Messages
+        "com.huawei.message",                 // Huawei Messages
+        "com.huawei.mms",                     // Huawei MMS
+        "com.asus.message",                   // Asus Messages
+        "com.sonyericsson.conversations"      // Sony Xperia Messages
+    )
+
+    // Explicitly blocked social, instant messaging, and chat apps
+    val BLOCKED_PACKAGES = setOf(
+        "com.whatsapp",
+        "com.whatsapp.w4b",
+        "org.telegram.messenger",
+        "org.telegram.plus",
+        "org.thunderdog.challegram",
+        "com.instagram.android",
+        "com.discord",
+        "com.snapchat.android",
+        "com.facebook.orca",
+        "com.facebook.katana",
+        "com.facebook.lite",
+        "com.linkedin.android",
+        "com.slack",
+        "com.twitter.android",
+        "com.x.android",
+        "com.viber.voip",
+        "com.skype.raider",
+        "com.tencent.mm",
+        "jp.naver.line.android",
+        "org.thoughtcrime.securesms",
+        "com.reddit.frontpage",
+        "com.google.android.gm",
+        "com.microsoft.office.outlook"
+    )
+
+    /**
+     * Checks whether the incoming notification package belongs to an authorized SMS messaging app
+     * or the device's currently configured default SMS application.
+     */
+    fun isSmsPackage(packageName: String, defaultSmsPackage: String? = null): Boolean {
+        if (packageName.isBlank()) return false
+        if (packageName == SELF_PACKAGE) return false
+        if (BLOCKED_PACKAGES.contains(packageName)) return false
+
+        // 1. Check if matches dynamically detected system default SMS package
+        if (!defaultSmsPackage.isNullOrBlank() && packageName.equals(defaultSmsPackage, ignoreCase = true)) {
+            return true
+        }
+
+        // 2. Check recognized standard SMS allowlist
+        return ALLOWED_SMS_PACKAGES.contains(packageName)
+    }
+
     // Strict Noise & Scam Filter:
     // Notice: Disclaimers like "Bank never asks for OTP" or "Do not share OTP" are NOT treated as OTP prompts!
     // Only real OTP/auth challenges or failed/declined transactions are filtered.
@@ -114,7 +178,14 @@ object TransactionNotificationParser {
     )
 
     private val PROMO_REGEX = Regex(
-        """(?i)\b(?:win\s+up\s+to|flat\s+\d+%\s+off|pre[- ]approved\s+loan|apply\s+now|claim\s+your|special\s+offer|congratulations\s+you\s+won)\b"""
+        """(?i)\b(?:win\s+up\s+to|flat\s+\d+%\s+off|pre[- ]approved\s+loan|apply\s+now|claim\s+your|special\s+offer|congratulations\s+you\s+won|credit\s+score|cibil\s+score|credit\s+report|instant\s+loan)\b"""
+    )
+
+    // Financial & banking context verification
+    // Ensures casual chat messages or random text messages mentioning numbers/currencies
+    // without genuine banking/account context are strictly ignored.
+    private val FINANCIAL_CONTEXT_REGEX = Regex(
+        """(?i)\b(?:a/c|acct|account|card\b|ending\s+(?:in\s+)?(?:\d+|x+)|upi|vpa|utr|ref(?:\s*no\.?)?|txn|trans|bank|neft|rtgs|imps|pos\b|atm\b|bal(?:ance)?|avl\.?\s*bal|debited\s+(?:from|by|with|for)|is\s+debited|debited\b|credited\s+(?:to|with|by|for)|is\s+credited|credited\b|paid\s+(?:to|at|you)|has\s+paid|sent\s+(?:to|you)|has\s+sent|transferred\s+(?:to|from)|has\s+transferred|deposited\s+(?:in|into)|withdrawn|payment\s+(?:of|to|from)|received\s+(?:from|via)|money\s+received)\b"""
     )
 
     // Income indicators (money coming IN to the user)
@@ -155,6 +226,7 @@ object TransactionNotificationParser {
 
     /**
      * Parses a notification from its package, title, and body text fields.
+     * Enforces strict SMS-only package filtering and financial context validation.
      * Returns a valid [ParsedTransaction] or null if the notification is not a completed financial transaction.
      */
     fun parse(
@@ -164,9 +236,13 @@ object TransactionNotificationParser {
         bigText: String? = null,
         subText: String? = null,
         textLines: String? = null,
-        postTime: Long = System.currentTimeMillis()
+        postTime: Long = System.currentTimeMillis(),
+        defaultSmsPackage: String? = null
     ): ParsedTransaction? {
-        if (packageName == SELF_PACKAGE) return null
+        // Enforce SMS-only package filtering (reject chat, social, or unauthorized apps)
+        if (!isSmsPackage(packageName, defaultSmsPackage)) {
+            return null
+        }
 
         // Collect all available text sources
         val bodyParts = listOfNotNull(bigText, textLines, text, subText)
@@ -177,7 +253,7 @@ object TransactionNotificationParser {
 
         if (combinedText.isBlank()) return null
 
-        // 1. Noise, scam, OTP, and failure filtering
+        // 1. Noise, scam, OTP, failure, promo, and financial context filtering
         if (OTP_PROMPT_REGEX.containsMatchIn(combinedText)) {
             return null
         }
@@ -188,6 +264,9 @@ object TransactionNotificationParser {
             return null
         }
         if (PROMO_REGEX.containsMatchIn(combinedText)) {
+            return null
+        }
+        if (!FINANCIAL_CONTEXT_REGEX.containsMatchIn(combinedText)) {
             return null
         }
 
@@ -325,13 +404,13 @@ object TransactionNotificationParser {
             // "<Sender> (has) paid / sent you" e.g. "AJAZ Ahmad WANI paid you 101.00" or "Ajaz sent you ₹101"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:paid|sent)\s+you\b"""),
             // "received / credited ... (by transfer) from <Sender>" e.g. "credited to your account XX1234 by transfer from AJAZ Ahmad WANI"
-            Regex("""(?i)\b(?:received|credited|deposit|deposited)\s+(?:.*?\s+)?(?:(?:by\s+)?transfer\s+from|from|by)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "(by transfer) from <Sender>"
-            Regex("""(?i)\b(?:(?:by\s+)?transfer\s+from|from|by)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\b(?:received|credited|deposit|deposited)\s+(?:.*?\s+)?(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "paid ... to/at <Merchant>" / "sent ... to <Merchant>" / "payment of ... to <Merchant>"
             Regex("""(?i)\b(?:paid|sent|spent|payment|transfer|transferred)\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "to/at <Merchant>"
             Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "(by transfer) from <Sender>"
+            Regex("""(?i)\b(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "Info: <Merchant>" e.g. Info: UPI/Uber or Info: Amazon Retail
             Regex("""(?i)\b(?:info:?|ref:?)\s*([A-Za-z0-9\s&'’\.\-_/]+?)(?:\s*\.|\s+Total|\s+Avl|\s+Bal|$)"""),
             // "VPA <upi_id>"
@@ -384,7 +463,7 @@ object TransactionNotificationParser {
         }
 
         // If candidate is simply an account or card label, discard
-        if (trimmed.matches(Regex("""(?i)^(?:a/c|acct|account|card)\s*[*xX\d]*$"""))) {
+        if (trimmed.matches(Regex("""(?i)^(?:your\s+)?(?:a/c|acct|account|card|bank)\b.*$"""))) {
             return ""
         }
 

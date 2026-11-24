@@ -136,8 +136,8 @@ class AutoDetectTransactionIntegrationTest {
 
         val rawNotification = "AJAZ Ahmad WANI paid you ₹101.00"
         val parsed = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
+            packageName = "com.google.android.apps.messaging",
+            title = "Google Messages",
             text = rawNotification
         )
         assertNotNull(parsed)

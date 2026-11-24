@@ -1,6 +1,6 @@
 # Privacy Policy for Vaulta - Smart Expense Tracker
 
-**Last updated:** November 22nd , 2026
+**Last updated:** November 24th, 2026
 
 **Vaulta - Smart Expense Tracker** ("Vaulta", "we", "us", or "our"), developed by winblader.org, respects your privacy and is committed to protecting the personal data of our users. This Privacy Policy explains how your information is collected, used, and stored when you use the Vaulta Android application (`com.waleed.vaulta.android`).
 
@@ -23,15 +23,16 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.
-- **Notification Access Service (`NotificationListenerService` / `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature. Processed 100% locally on-device and never transmitted to external servers.
+- **Notification Access Service (`NotificationListenerService` / `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature to read incoming **SMS / text messaging alerts** (e.g., Google Messages or your device's default SMS app). Evaluated 100% locally on-device and never transmitted to external servers. Chat apps (WhatsApp, Telegram, Instagram, Discord, etc.) are completely excluded.
 - **Vibration (`VIBRATE`):** Used to provide haptic feedback during alerts and reminders.
 - **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with Supabase authentication and cloud sync services.
 
-### D. Optional On-Device Transaction Auto-Detection
+### D. Optional On-Device Transaction Auto-Detection (SMS Only)
 When you explicitly enable **Auto-Detect Transactions** in your Profile settings and grant Android Notification Access:
-- **100% Local On-Device Processing:** Vaulta parses payment alerts from supported banking SMS, cards, and payment apps (e.g., Google Pay, PhonePe, Paytm, Revolut, Wise, PayPal, Monzo, etc.) entirely locally within your device's memory.
+- **Strictly Limited to SMS Messaging Apps:** Auto-detection exclusively listens to notifications from standard SMS/text messaging apps (Google Messages, Samsung Messages, or your default SMS app). Vaulta **strictly blocks and ignores** chat, messaging, and social apps (including WhatsApp, Telegram, Instagram, Discord, Facebook Messenger, Slack, etc.), preventing casual conversations from ever being detected.
+- **100% Local On-Device Processing:** Vaulta parses bank, card, and payment SMS alerts entirely locally within your device's memory.
 - **Zero Raw Text Uploads:** Raw notification contents, sender details, and message bodies are **never saved, cached, or transmitted** to any cloud server or external third party.
-- **Strict Data Filtering:** Non-transaction notifications—including One-Time Passwords (OTPs), authentication codes, personal messaging chats, promotional alerts, and ending account balances—are strictly discarded and never logged.
+- **Strict Data Filtering:** Non-transaction notifications—including One-Time Passwords (OTPs), authentication codes, personal messaging texts, promotional alerts, and ending account balances—are strictly discarded and never logged.
 - **User Control & Revocation:** Auto-Detect is disabled by default. You can turn it off at any time directly in the Vaulta Profile screen or revoke Notification Access in your device's Android System Settings.
 
 ---

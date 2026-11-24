@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.1%20(Build%207)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.1"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.2%20(Build%208)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.2"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -75,13 +75,14 @@
 - **Strict Multi-Account Isolation:** Database queries partition transactions strictly by user ID (`WHERE userId = :userId`), and signing out automatically purges local cached records so accounts on the same device never leak or mix data.
 - **Cloud Backend Sync:** Authenticated profiles and transaction data synchronize securely with PostgreSQL on Supabase protected by Row Level Security (RLS).
 
-### 6. ⚡ Smart Auto-Detect Transactions (Privacy-First On-Device)
-- **Automatic Payment Logging:** Optional, strictly opt-in feature using Android's `NotificationListenerService` to automatically record income and expenses from bank alerts, credit/debit cards, and digital wallets.
-- **Comprehensive Source Compatibility:** Compatible with Indian UPI & digital wallets (Google Pay, PhonePe, Paytm, BHIM, Amazon Pay) and international payment platforms (Revolut, Wise, Monzo, PayPal, Venmo, Cash App, Zelle, Starling, Apple Wallet, Google Wallet).
+### 6. ⚡ Smart Auto-Detect Transactions (Privacy-First On-Device, SMS-Only)
+- **Automatic Payment Logging from SMS:** Optional, strictly opt-in feature using Android's `NotificationListenerService` to automatically record income and expenses from official bank and payment SMS text messages.
+- **Strict SMS-Only Allowlist:** Dynamically inspects the system default SMS app (`Telephony.Sms.getDefaultSmsPackage`) and recognized messaging apps (`com.google.android.apps.messaging`, `com.android.mms`, `com.samsung.android.messaging`, `com.miui.mms`, `com.microsoft.android.smsorganizer`, etc.). Explicitly blocks and ignores social and chat apps like WhatsApp, Telegram, Instagram, Discord, Slack, etc., ensuring casual chat conversations are never logged.
+- **Financial Context Validation:** Employs strict structural validation requiring legitimate banking/transaction indicators (A/c, card ending, UPI, ref, balance, debited/credited) to guarantee casual texts mentioning currency or numbers are safely rejected.
 - **Multi-Currency Parser:** Extracts amounts in global formats and currencies (`₹`, `Rs.`, `$`, `USD`, `€`, `EUR`, `£`, `GBP`, `AED`, `SAR`, etc.) including European comma formats (`€19,99`).
 - **100% Local & Private:** Evaluated strictly on-device in memory. Raw notification text is **never saved, logged, or uploaded** to the cloud.
 - **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
-- **Intelligent Deduplication & Direction Protection:** 25-second rolling window prevents duplicate entries across simultaneous SMS and push alerts, and guarantees that incoming credit alerts (e.g. "X paid you", "sent you", "received from", "credited") are strictly classified as Income and never produce duplicate or contradictory Expense rows.
+- **Intelligent Deduplication & Direction Protection:** 25-second rolling window prevents duplicate entries across simultaneous SMS alerts, and guarantees that incoming credit alerts (e.g. "X paid you", "sent you", "received from", "credited") are strictly classified as Income and never produce duplicate or contradictory Expense rows.
 - **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"AJAZ Ahmad WANI Paid You 101.00"` to `"AJAZ Ahmad WANI"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
 
 ### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
@@ -208,7 +209,7 @@ Vaulta/
 │   │   │   │   └── Vaulta.kt                # Application class (@HiltAndroidApp)
 │   │   │   └── res/                         # Vector drawables, mipmaps, string resources
 │   │   └── test/                            # Unit and instrumentation tests
-│   ├── build.gradle.kts                     # App module build configuration (v1.4.1)
+│   ├── build.gradle.kts                     # App module build configuration (v1.4.2)
 │   └── proguard-rules.pro                   # ProGuard / R8 rules
 ├── screenshots/                             # High-resolution application screenshots
 ├── PRIVACY_POLICY.md                        # Official Privacy Policy

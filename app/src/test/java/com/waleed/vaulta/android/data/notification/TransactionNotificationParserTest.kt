@@ -16,7 +16,114 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 1. Real-World Indian Bank SMS & UPI Alerts
+    // 1. SMS-Only Package Filtering Tests (Reject Chat / Social Apps)
+    // ============================================================
+
+    @Test
+    fun testChatAndSocialAppsAreStrictlyIgnored() {
+        val nonSmsPackages = listOf(
+            "com.whatsapp",
+            "com.whatsapp.w4b",
+            "org.telegram.messenger",
+            "org.telegram.plus",
+            "com.instagram.android",
+            "com.discord",
+            "com.snapchat.android",
+            "com.facebook.orca",
+            "com.facebook.katana",
+            "com.slack",
+            "com.twitter.android",
+            "com.viber.voip",
+            "com.skype.raider",
+            "com.unknown.randomchat"
+        )
+
+        for (pkg in nonSmsPackages) {
+            val result = TransactionNotificationParser.parse(
+                packageName = pkg,
+                title = "Incoming Message",
+                text = "Paid Rs. 500 to Swiggy from A/c XX1234"
+            )
+            assertNull("Expected notification from $pkg to be strictly ignored", result)
+        }
+    }
+
+    @Test
+    fun testDefaultSmsPackageIsDynamicallyAllowed() {
+        val customOemSms = "com.custom.oem.messaging"
+
+        // When custom package is NOT the default SMS package, it is rejected
+        val rejected = TransactionNotificationParser.parse(
+            packageName = customOemSms,
+            title = "Bank Alert",
+            text = "Rs. 500.00 debited from A/c XX1234 on 24-Nov-26. Info: Swiggy. Avl Bal: Rs 12,000.00",
+            defaultSmsPackage = null
+        )
+        assertNull(rejected)
+
+        // When custom package IS configured as the active system default SMS package, it is accepted
+        val accepted = TransactionNotificationParser.parse(
+            packageName = customOemSms,
+            title = "Bank Alert",
+            text = "Rs. 500.00 debited from A/c XX1234 on 24-Nov-26. Info: Swiggy. Avl Bal: Rs 12,000.00",
+            defaultSmsPackage = customOemSms
+        )
+        assertNotNull(accepted)
+        assertEquals(500.0, accepted!!.amount, 0.01)
+        assertEquals("Expense", accepted.type)
+    }
+
+    @Test
+    fun testStandardAllowedSmsPackagesAreAccepted() {
+        val allowedSmsPackages = listOf(
+            "com.google.android.apps.messaging",
+            "com.android.mms",
+            "com.samsung.android.messaging",
+            "com.miui.mms",
+            "com.oneplus.mms",
+            "com.oppo.mms",
+            "com.coloros.mms",
+            "com.vivo.message",
+            "com.microsoft.android.smsorganizer",
+            "com.motorola.messaging"
+        )
+
+        for (pkg in allowedSmsPackages) {
+            assertTrue("Expected $pkg to be recognized as an authorized SMS app",
+                TransactionNotificationParser.isSmsPackage(pkg)
+            )
+        }
+    }
+
+    // ============================================================
+    // 2. Casual Chat / Non-Financial Text Elimination Tests
+    // ============================================================
+
+    @Test
+    fun testCasualSmsMessagesWithoutFinancialContextAreIgnored() {
+        val casualMessages = listOf(
+            "Hey bro, do you have 500 credit on your phone?",
+            "I need 20 dollars credit to play the game.",
+            "Can you lend me 50 bucks debit?",
+            "Your credit score is 750, check your report online.",
+            "Get flat 50% off on your next credit card purchase!",
+            "You have earned 100 bonus credit points today.",
+            "Hey buddy, check out this 500 rupee movie ticket.",
+            "Thanks for the 200 credits in the arcade."
+        )
+
+        for (msg in casualMessages) {
+            val result = TransactionNotificationParser.parse(
+                packageName = "com.google.android.apps.messaging",
+                title = "Friend",
+                text = msg
+            )
+            assertNull("Expected casual message '$msg' to be rejected", result)
+        }
+    }
+
+    // ============================================================
+    // 3. Real-World Indian Bank & Payment SMS Alerts
     // ============================================================
 
     @Test
@@ -44,9 +151,9 @@ class TransactionNotificationParserTest {
 
         // Sent Rs.250 to Merchant via UPI
         val res3 = TransactionNotificationParser.parse(
-            packageName = "com.google.android.apps.nbu.paisa.user",
-            title = "Google Pay",
-            text = "Sent Rs.250 to Chai Point via UPI"
+            packageName = "com.google.android.apps.messaging",
+            title = "Google Pay SMS",
+            text = "Sent Rs.250 to Chai Point via UPI from A/c XX1234"
         )
         assertNotNull(res3)
         assertEquals("Expense", res3!!.type)
@@ -56,9 +163,9 @@ class TransactionNotificationParserTest {
 
         // Paid ₹180.00 to Zomato
         val res4 = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "Paid ₹180.00 to Zomato"
+            packageName = "com.samsung.android.messaging",
+            title = "PhonePe SMS",
+            text = "Paid ₹180.00 to Zomato using UPI"
         )
         assertNotNull(res4)
         assertEquals("Expense", res4!!.type)
@@ -79,9 +186,9 @@ class TransactionNotificationParserTest {
 
         // Received Rs 1000 from ...
         val res6 = TransactionNotificationParser.parse(
-            packageName = "net.one97.paytm",
-            title = "Paytm",
-            text = "Received Rs 1000 from Priya via UPI"
+            packageName = "com.microsoft.android.smsorganizer",
+            title = "Paytm SMS",
+            text = "Received Rs 1000 from Priya via UPI in your A/c XX99"
         )
         assertNotNull(res6)
         assertEquals("Income", res6!!.type)
@@ -191,36 +298,8 @@ class TransactionNotificationParserTest {
         assertEquals("Salary", result.category)
     }
 
-    @Test
-    fun testGooglePayPushNotification() {
-        val result = TransactionNotificationParser.parse(
-            packageName = "com.google.android.apps.nbu.paisa.user",
-            title = "Google Pay",
-            text = "Paid ₹250.00 to Swiggy"
-        )
-        assertNotNull(result)
-        assertEquals("Expense", result!!.type)
-        assertEquals(250.0, result.amount, 0.01)
-        assertEquals("Food", result.category)
-        assertTrue(result.title.contains("Swiggy", ignoreCase = true))
-    }
-
-    @Test
-    fun testPhonePePushNotification() {
-        val result = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "Payment of ₹180 to Chai Point successful"
-        )
-        assertNotNull(result)
-        assertEquals("Expense", result!!.type)
-        assertEquals(180.0, result.amount, 0.01)
-        assertEquals("Food", result.category)
-        assertTrue(result.title.contains("Chai Point", ignoreCase = true))
-    }
-
     // ============================================================
-    // 2. OTP Disclaimer Tolerance (Must NOT reject real transaction)
+    // 4. OTP Disclaimer Tolerance (Must NOT reject real transaction)
     // ============================================================
 
     @Test
@@ -250,12 +329,11 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 3. Multi-Field Extraction (BigText, SubText, TextLines)
+    // 5. Multi-Field Extraction (BigText, SubText, TextLines)
     // ============================================================
 
     @Test
     fun testExtractionFromBigTextAndTextLines() {
-        // When text is short summary ("1 new message") and full detail is in textLines or bigText
         val result = TransactionNotificationParser.parse(
             packageName = "com.google.android.apps.messaging",
             title = "ICICI Bank",
@@ -270,14 +348,14 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 4. International Bank & Digital Wallet Alerts
+    // 6. Global Multi-Currency Bank SMS Alerts
     // ============================================================
 
     @Test
     fun testChaseUsdAlert() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.chase.sig.android",
-            title = "Chase Alert",
+            packageName = "com.google.android.apps.messaging",
+            title = "Chase Bank",
             text = "Chase: You made a $42.50 purchase at STARBUCKS with card ending 1234."
         )
         assertNotNull(result)
@@ -291,9 +369,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testRevolutEurAlertWithEuropeanComma() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.revolut.revolut",
-            title = "Revolut",
-            text = "You spent €19,99 at Spotify."
+            packageName = "com.google.android.apps.messaging",
+            title = "Revolut SMS",
+            text = "Revolut: You spent €19,99 at Spotify from your card."
         )
         assertNotNull(result)
         assertEquals("Expense", result!!.type)
@@ -306,9 +384,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testMonzoGbpAlert() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.monzo.android",
-            title = "Monzo",
-            text = "£85.00 spent at Tesco."
+            packageName = "com.google.android.apps.messaging",
+            title = "Monzo SMS",
+            text = "Monzo: £85.00 spent at Tesco from account ending in 4321."
         )
         assertNotNull(result)
         assertEquals("Expense", result!!.type)
@@ -321,9 +399,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testWiseAedTransferAlert() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.transferwise.android",
-            title = "Wise",
-            text = "You sent 150.75 AED to Ahmed."
+            packageName = "com.google.android.apps.messaging",
+            title = "Wise SMS",
+            text = "Wise: You sent 150.75 AED to Ahmed from your account."
         )
         assertNotNull(result)
         assertEquals("Expense", result!!.type)
@@ -335,9 +413,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testPayPalIncomeAlert() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.paypal.android.p2pmobile",
-            title = "PayPal",
-            text = "You received $120.00 USD from Client LLC."
+            packageName = "com.google.android.apps.messaging",
+            title = "PayPal SMS",
+            text = "PayPal: You received $120.00 USD from Client LLC in your balance."
         )
         assertNotNull(result)
         assertEquals("Income", result!!.type)
@@ -346,23 +424,8 @@ class TransactionNotificationParserTest {
         assertTrue(result.title.contains("Client LLC", ignoreCase = true))
     }
 
-    @Test
-    fun testGoogleWalletNfcAlert() {
-        val result = TransactionNotificationParser.parse(
-            packageName = "com.google.android.apps.walletnfcrel",
-            title = "Google Wallet",
-            text = "Paid USD 15.00 at Shell Gas Station."
-        )
-        assertNotNull(result)
-        assertEquals("Expense", result!!.type)
-        assertEquals(15.0, result.amount, 0.01)
-        assertEquals("USD", result.currencyCode)
-        assertEquals("Transport", result.category)
-        assertTrue(result.title.contains("Shell", ignoreCase = true))
-    }
-
     // ============================================================
-    // 5. Balance Exclusion Tests (Avl Bal must NOT override amount)
+    // 7. Balance Exclusion Tests (Avl Bal must NOT override amount)
     // ============================================================
 
     @Test
@@ -388,7 +451,7 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 6. Noise, Scam, OTP, Declined & Balance-Only Rejections
+    // 8. Noise, Scam, OTP, Declined & Balance-Only Rejections
     // ============================================================
 
     @Test
@@ -404,7 +467,7 @@ class TransactionNotificationParserTest {
     @Test
     fun testDeclinedTransactionIsRejected() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.chase.sig.android",
+            packageName = "com.google.android.apps.messaging",
             title = "Chase Alert",
             text = "Your transaction of $45.00 at Walmart was declined due to insufficient funds."
         )
@@ -414,9 +477,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testFailedPaymentIsRejected() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "Payment of ₹1,000 to John failed. Amount if deducted will be refunded."
+            packageName = "com.google.android.apps.messaging",
+            title = "PhonePe SMS",
+            text = "Payment of ₹1,000 to John failed. Amount if deducted will be refunded to your account."
         )
         assertNull(result)
     }
@@ -424,8 +487,8 @@ class TransactionNotificationParserTest {
     @Test
     fun testPaymentRequestIsRejected() {
         val result = TransactionNotificationParser.parse(
-            packageName = "com.venmo",
-            title = "Venmo",
+            packageName = "com.google.android.apps.messaging",
+            title = "Venmo SMS",
             text = "Jane Doe has requested $25.00 from you on Venmo."
         )
         assertNull(result)
@@ -444,7 +507,7 @@ class TransactionNotificationParserTest {
     @Test
     fun testPromotionalMarketingIsRejected() {
         val result = TransactionNotificationParser.parse(
-            packageName = "net.one97.paytm",
+            packageName = "com.google.android.apps.messaging",
             title = "Paytm Offers",
             text = "Win up to ₹500 cashback on your next recharge! Apply now."
         )
@@ -462,16 +525,15 @@ class TransactionNotificationParserTest {
     }
 
     // ============================================================
-    // 7. Deduplication & Contradictory Credit/Debit Suppression Tests
+    // 9. Deduplication & Contradictory Credit/Debit Suppression Tests
     // ============================================================
 
     @Test
     fun testIncomingP2pTransferPaidYouIsClassifiedAsIncomeAndCleansTitle() {
-        // Notification 1: UPI app alert where body is "AJAZ Ahmad WANI paid you ₹101.00"
         val res1 = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "AJAZ Ahmad WANI paid you ₹101.00"
+            packageName = "com.google.android.apps.messaging",
+            title = "UPI Alert",
+            text = "AJAZ Ahmad WANI paid you ₹101.00 via UPI"
         )
         assertNotNull(res1)
         assertEquals("Income", res1!!.type)
@@ -479,11 +541,10 @@ class TransactionNotificationParserTest {
         assertTrue(res1.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
         assertFalse(res1.title.contains("paid you", ignoreCase = true))
 
-        // Notification 2: UPI app alert where title has redundant "Paid You 101.00"
         val res2 = TransactionNotificationParser.parse(
-            packageName = "com.google.android.apps.nbu.paisa.user",
+            packageName = "com.samsung.android.messaging",
             title = "AJAZ Ahmad WANI Paid You 101.00",
-            text = "AJAZ Ahmad WANI paid you 101.00"
+            text = "AJAZ Ahmad WANI paid you 101.00 via UPI"
         )
         assertNotNull(res2)
         assertEquals("Income", res2!!.type)
@@ -495,9 +556,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testIncomingP2pSentYouAndReceivedFromClassifiedAsIncome() {
         val res1 = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "AJAZ Ahmad WANI sent you Rs. 101.00"
+            packageName = "com.samsung.android.messaging",
+            title = "UPI SMS",
+            text = "AJAZ Ahmad WANI sent you Rs. 101.00 via UPI"
         )
         assertNotNull(res1)
         assertEquals("Income", res1!!.type)
@@ -528,9 +589,9 @@ class TransactionNotificationParserTest {
     @Test
     fun testOutgoingDebitSentToAndPaidToClassifiedAsExpense() {
         val res1 = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "Paid Rs. 101.00 to AJAZ Ahmad WANI"
+            packageName = "com.google.android.apps.messaging",
+            title = "UPI SMS",
+            text = "Paid Rs. 101.00 to AJAZ Ahmad WANI via UPI"
         )
         assertNotNull(res1)
         assertEquals("Expense", res1!!.type)
@@ -538,18 +599,18 @@ class TransactionNotificationParserTest {
         assertTrue(res1.title.contains("AJAZ Ahmad WANI", ignoreCase = true))
 
         val res2 = TransactionNotificationParser.parse(
-            packageName = "com.google.android.apps.nbu.paisa.user",
-            title = "Google Pay",
-            text = "You paid Rs. 101.00 to AJAZ Ahmad WANI"
+            packageName = "com.android.mms",
+            title = "Bank SMS",
+            text = "You paid Rs. 101.00 to AJAZ Ahmad WANI from A/c XX1234"
         )
         assertNotNull(res2)
         assertEquals("Expense", res2!!.type)
         assertEquals(101.0, res2.amount, 0.01)
 
         val res3 = TransactionNotificationParser.parse(
-            packageName = "com.phonepe.app",
-            title = "PhonePe",
-            text = "Sent Rs. 101.00 to AJAZ Ahmad WANI"
+            packageName = "com.samsung.android.messaging",
+            title = "PhonePe SMS",
+            text = "Sent Rs. 101.00 to AJAZ Ahmad WANI using UPI"
         )
         assertNotNull(res3)
         assertEquals("Expense", res3!!.type)
@@ -573,7 +634,7 @@ class TransactionNotificationParserTest {
         val isFirstDuplicate = TransactionDeduplicator.isDuplicate(101.0, "Income", "AJAZ Ahmad WANI", now)
         assertFalse(isFirstDuplicate)
 
-        // 2. Second event: Near-simultaneous push alert arrives 2s later
+        // 2. Second event: Duplicate alert arrives 2s later
         val isDuplicateIncome = TransactionDeduplicator.isDuplicate(101.0, "Income", "AJAZ Ahmad WANI", now + 2_000L)
         assertTrue(isDuplicateIncome)
 
@@ -598,7 +659,7 @@ class TransactionNotificationParserTest {
         val isFirstDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now)
         assertFalse(isFirstDuplicate)
 
-        // Second notification: GPay push alert 3 seconds later for same Rs 250 at Swiggy -> duplicate!
+        // Second notification: Duplicate SMS alert 3 seconds later for same Rs 250 at Swiggy -> duplicate!
         val isSecondDuplicate = TransactionDeduplicator.isDuplicate(250.0, "Expense", "Swiggy", now + 3_000L)
         assertTrue(isSecondDuplicate)
 

@@ -206,7 +206,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     ExpenseTextView(
-                        text = "Vaulta can automatically detect and log your income and expenses when you receive payment notifications from banks, cards, wallets, or UPI apps.",
+                        text = "Vaulta can automatically detect and log your income and expenses when you receive bank & payment SMS text messages (via Google Messages or your default SMS app).",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp
@@ -224,14 +224,14 @@ fun ProfileScreen(
                     ) {
                         Column {
                             ExpenseTextView(
-                                text = "🔒 100% On-Device & Private:",
+                                text = "🔒 100% On-Device & Private (SMS Only):",
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Zinc
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             ExpenseTextView(
-                                text = "• Notifications are analyzed strictly locally on your device.\n• Raw notification text is never saved or uploaded to the cloud.\n• OTPs, security codes, balances, and personal chats are completely ignored.\n• Compatible with Indian UPI (GPay, PhonePe, Paytm) and international banking alerts.",
+                                text = "• Strictly SMS Only: Parses only incoming SMS text alerts from Google Messages or your default SMS app. Chat apps (WhatsApp, Telegram, Instagram, Discord, etc.) are never read.\n• 100% Local & Private: Raw SMS text is analyzed strictly in memory and is never saved, logged, or uploaded.\n• Noise & Scam Elimination: OTPs, security verification codes, ending balances, and personal chat texts are completely ignored.\n• Verified Bank Alerts: Supports standard Indian bank SMS formats (HDFC, ICICI, SBI, Axis, Kotak, etc.) and global payment SMS.",
                                 fontSize = 11.5.sp,
                                 color = LightGrey,
                                 lineHeight = 16.sp
@@ -813,7 +813,7 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             ExpenseTextView(
-                                text = "Automatically log income & expenses from bank, card & payment notifications",
+                                text = "Automatically log income & expenses from bank & payment SMS text alerts",
                                 fontSize = 13.sp,
                                 color = LightGrey,
                                 lineHeight = 18.sp

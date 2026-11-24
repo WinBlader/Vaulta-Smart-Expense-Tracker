@@ -139,7 +139,25 @@ class VaultaNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        // 2. Safe text extraction supporting CharSequence / SpannableString across all Android notification styles
+        // 2. Strict SMS-only package filtering (Google Messages / default SMS / OEM SMS)
+        // Explicitly rejects WhatsApp, Telegram, Instagram, Discord, and any non-SMS apps.
+        val defaultSmsPackage = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                android.provider.Telephony.Sms.getDefaultSmsPackage(this)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to resolve default SMS package", e)
+            null
+        }
+
+        if (!TransactionNotificationParser.isSmsPackage(sbn.packageName, defaultSmsPackage)) {
+            Log.d(TAG, "Notification ignored: package '${sbn.packageName}' is not an authorized SMS messaging app")
+            return
+        }
+
+        // 3. Safe text extraction supporting CharSequence / SpannableString across all Android notification styles
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim() ?: ""
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim() ?: ""
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim()
@@ -171,7 +189,8 @@ class VaultaNotificationListenerService : NotificationListenerService() {
                     bigText = bigText,
                     subText = subText,
                     textLines = textLines,
-                    postTime = sbn.postTime
+                    postTime = sbn.postTime,
+                    defaultSmsPackage = defaultSmsPackage
                 )
 
                 if (parsed == null) {
