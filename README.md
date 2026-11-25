@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.7%20(Build%2013)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.7"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.7%20(Build%2014)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.7"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -77,11 +77,13 @@
 - **Monthly Budget Ceilings:** Set monthly spending targets with automatic alerts when approaching 80% or exceeding 100%.
 
 ### 5. 🔐 Flexible Authentication & Full Cloud Backup / Restore Across Reinstall (v1.4.7)
-- **Multi-Method Sign-In:** Sign in using Email, Google One-Tap, or Mobile Number.
+- **Multi-Method Sign-In:** Sign in using Google One-Tap / Android Credential Manager, Email & Password, Mobile Number & Password (without OTP), or Email / Phone OTP.
 - **Editable International Calling Code:** Mobile login and registration feature a side-by-side editable country code input (defaulting to `+91`, supporting all global codes like `+1`, `+44`, `+971`) with E.164 normalization.
-- **Full Cloud Backup & Reinstall Restore for ALL User Data:** Authenticated profiles, transactions, Credit/Owe obligations, optional notes, monthly budget limits, and currency preferences synchronize securely with PostgreSQL on Supabase protected by Row Level Security (`auth.uid() = user_id`). Uninstalling and reinstalling the app and logging back in immediately restores 100% of user profile details (`displayName`, `phoneNumber` sanitized of placeholder empty values, `currencyCode`, `monthlyBudget`, `privacyPolicyAccepted`) and all historical transactions and Credit/Owe obligations directly into local RoomDB and preferences.
-- **100% Offline Guest Mode:** Use all core features anonymously without creating an account or uploading data to the cloud; Guest Mode makes zero network calls.
-- **Strict Multi-Account Isolation:** Database queries partition transactions strictly by user ID (`WHERE userId = :userId`), and signing out automatically purges local cached records so accounts on the same device never leak or mix data.
+- **Full Supabase Cloud Backup & Reinstall Restore:** Authenticated user profiles, transactions, Credit/Owe obligations, optional notes, monthly budget limits, and currency preferences synchronize securely with PostgreSQL on Supabase protected by Row Level Security (`auth.uid() = user_id`). Uninstalling and reinstalling the app and logging back in immediately restores 100% of user profile details and all historical transactions directly into local RoomDB and preferences.
+- **Persistent Profile Details Across Reinstalls:** Profile edits (such as custom display names and phone numbers) are preserved across logins and app reinstalls for Google, Email, and Mobile Number accounts without being overwritten by OAuth defaults, generic email prefixes, or `"EMPTY"` placeholders.
+- **One-Time Privacy Policy Consent Gate Across All Entry Paths:** Full-screen Privacy Policy acceptance gate enforced consistently across Continue with Google, Email Sign-In / Sign-Up, Mobile Number Sign-In / Sign-Up (without OTP), and Guest Mode. Acceptance is saved locally and synchronized to Supabase `public.profiles` (`privacy_policy_accepted = true`), ensuring returning users who already accepted are never prompted again.
+- **100% Offline Guest Mode:** Use all core features anonymously without creating an account or uploading data to the cloud; Guest Mode makes zero network calls and stores data strictly on-device.
+- **Strict Multi-Account Isolation:** Database queries partition transactions strictly by user ID (`WHERE userId = :userId`), and switching accounts safely isolates transaction histories and settings without data leakage.
 
 ### 6. ⚡ Smart Auto-Detect Transactions (Privacy-First On-Device, SMS-Only)
 - **Automatic Payment Logging from SMS:** Optional, strictly opt-in feature using Android's `NotificationListenerService` to automatically record income and expenses from official bank and payment SMS text messages.
