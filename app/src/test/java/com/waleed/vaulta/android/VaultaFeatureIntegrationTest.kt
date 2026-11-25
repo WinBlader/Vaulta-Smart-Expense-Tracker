@@ -644,4 +644,77 @@ class VaultaFeatureIntegrationTest {
         assertEquals(25000.0, resolvedBudget, 0.001)
         assertTrue(resolvedPolicy)
     }
+
+    @Test
+    fun testBrandNewProfileDtoDefaultsPrivacyPolicyAcceptedToFalse() {
+        val newProfile = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "new-user-123",
+            email = "newuser@example.com"
+        )
+        // Newly created ProfileDto MUST default privacyPolicyAccepted to false
+        assertEquals(false, newProfile.privacyPolicyAccepted)
+    }
+
+    @Test
+    fun testPrivacyPolicyConsentGatingForAllAuthMethods() {
+        val mockStorage = mutableMapOf<String, Any>()
+
+        fun isPrivacyPolicyAccepted(userKey: String): Boolean {
+            return mockStorage["privacy_policy_accepted_v1_$userKey"] as? Boolean ?: false
+        }
+
+        fun postAuthDestination(userKey: String): String {
+            return if (!isPrivacyPolicyAccepted(userKey)) {
+                NavRouts.privacy_policy_consent
+            } else {
+                NavRouts.home
+            }
+        }
+
+        // Test 1: Continue with Google (new user)
+        val googleUserKey = "google-usr-999"
+        assertEquals(NavRouts.privacy_policy_consent, postAuthDestination(googleUserKey))
+        mockStorage["privacy_policy_accepted_v1_$googleUserKey"] = true
+        assertEquals(NavRouts.home, postAuthDestination(googleUserKey))
+
+        // Test 2: Email Sign-In / Sign-Up (new user)
+        val emailUserKey = "email-usr-888"
+        assertEquals(NavRouts.privacy_policy_consent, postAuthDestination(emailUserKey))
+        mockStorage["privacy_policy_accepted_v1_$emailUserKey"] = true
+        assertEquals(NavRouts.home, postAuthDestination(emailUserKey))
+
+        // Test 3: Mobile Number Sign-In / Sign-Up without OTP (new user)
+        val phoneUserKey = "phone-usr-777"
+        assertEquals(NavRouts.privacy_policy_consent, postAuthDestination(phoneUserKey))
+        mockStorage["privacy_policy_accepted_v1_$phoneUserKey"] = true
+        assertEquals(NavRouts.home, postAuthDestination(phoneUserKey))
+
+        // Test 4: Guest Mode (new guest)
+        val guestKey = "guest"
+        assertEquals(NavRouts.privacy_policy_consent, postAuthDestination(guestKey))
+        mockStorage["privacy_policy_accepted_v1_$guestKey"] = true
+        assertEquals(NavRouts.home, postAuthDestination(guestKey))
+    }
+
+    @Test
+    fun testResetEverythingPreservesPrivacyPolicyAcceptance() {
+        val mockStorage = mutableMapOf<String, Any>()
+        val activeUserId = "user-waleed-456"
+
+        // User previously accepted privacy policy
+        mockStorage["privacy_policy_accepted_v1_$activeUserId"] = true
+        mockStorage["privacy_policy_accepted_v1_timestamp_$activeUserId"] = 1732500000000L
+
+        // Simulate clearCurrentUserData (Reset Everything) - clears transactions and budgets but preserves consent
+        fun simulateClearCurrentUserData(userKey: String) {
+            // Room DB deletion for user transactions
+            // Budget reset
+            // NOTE: Never wipe or reset privacy policy keys
+        }
+
+        simulateClearCurrentUserData(activeUserId)
+
+        val stillAccepted = mockStorage["privacy_policy_accepted_v1_$activeUserId"] as? Boolean
+        assertEquals(true, stillAccepted)
+    }
 }

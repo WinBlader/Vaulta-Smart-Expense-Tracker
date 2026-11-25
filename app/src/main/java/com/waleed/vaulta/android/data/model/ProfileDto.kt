@@ -15,7 +15,7 @@ data class ProfileDto(
     @SerialName("auth_provider") val authProvider: String? = "Email",
     @SerialName("monthly_budget") val monthlyBudget: Double? = 0.0,
     @SerialName("currency_code") val currencyCode: String? = "INR",
-    @SerialName("privacy_policy_accepted") val privacyPolicyAccepted: Boolean? = true,
+    @SerialName("privacy_policy_accepted") val privacyPolicyAccepted: Boolean? = false,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null
 ) {

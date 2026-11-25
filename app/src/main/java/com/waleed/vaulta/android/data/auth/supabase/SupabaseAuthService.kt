@@ -885,15 +885,38 @@ class SupabaseAuthService @Inject constructor(
         }
     }
 
-    suspend fun updatePrivacyPolicyAcceptedCloud(): Unit = withContext(Dispatchers.IO) {
+    suspend fun updatePrivacyPolicyAcceptedCloud(userId: String? = null): Unit = withContext(Dispatchers.IO) {
         if (!SupabaseClientProvider.isConfigured()) return@withContext
         try {
             val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
-            client.auth.updateUser {
-                data {
-                    put("privacy_policy_accepted_v1", true)
-                    put("privacy_policy_accepted_at", nowStr)
+            val resolvedUserId = userId?.ifBlank { null }
+                ?: client.auth.currentUserOrNull()?.id
+                ?: sessionManager.currentUser.value?.id?.takeIf { it.isNotBlank() && it != "guest" }
+
+            // 1. Immediately update public.profiles table in Supabase Postgres
+            if (!resolvedUserId.isNullOrBlank() && resolvedUserId != "guest") {
+                try {
+                    client.from("profiles").update(mapOf("privacy_policy_accepted" to true)) {
+                        filter {
+                            eq("id", resolvedUserId)
+                        }
+                    }
+                    Log.d(TAG, "Successfully updated privacy_policy_accepted = true in public.profiles for $resolvedUserId")
+                } catch (pe: Exception) {
+                    Log.w(TAG, "Notice updating privacy policy in public.profiles: ${pe.message}")
                 }
+            }
+
+            // 2. Also update auth user metadata
+            try {
+                client.auth.updateUser {
+                    data {
+                        put("privacy_policy_accepted_v1", true)
+                        put("privacy_policy_accepted_at", nowStr)
+                    }
+                }
+            } catch (ae: Exception) {
+                Log.w(TAG, "Notice updating auth metadata: ${ae.message}")
             }
         } catch (e: Exception) {
             Log.w(TAG, "Notice updating privacy policy in Supabase: ${e.message}")

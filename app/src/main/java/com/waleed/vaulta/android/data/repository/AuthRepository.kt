@@ -309,10 +309,10 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String?) {
         val key = userKey ?: sessionManager.getCurrentUserKey()
         sessionManager.setPrivacyPolicyAccepted(accepted, key)
-        if (accepted) {
+        if (accepted && key != "guest") {
             withContext(Dispatchers.IO) {
                 try {
-                    supabaseAuthService.updatePrivacyPolicyAcceptedCloud()
+                    supabaseAuthService.updatePrivacyPolicyAcceptedCloud(key)
                 } catch (e: Exception) {
                     android.util.Log.w("AuthRepository", "Notice updating privacy policy in Supabase: ${e.message}")
                 }

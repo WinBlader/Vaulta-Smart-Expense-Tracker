@@ -124,7 +124,8 @@ fun PrivacyPolicyConsentScreen(
                     Button(
                         onClick = {
                             if (isChecked) {
-                                authViewModel.setPrivacyPolicyAccepted(true)
+                                val currentKey = authViewModel.currentUser.value?.id?.takeIf { it.isNotBlank() }
+                                authViewModel.setPrivacyPolicyAccepted(true, currentKey)
                                 navController.navigate(NavRouts.home) {
                                     popUpTo(NavRouts.privacy_policy_consent) { inclusive = true }
                                     launchSingleTop = true
