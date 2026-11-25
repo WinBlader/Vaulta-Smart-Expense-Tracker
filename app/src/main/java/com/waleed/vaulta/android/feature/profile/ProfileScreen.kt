@@ -731,7 +731,7 @@ fun ProfileScreen(
                     ProfileDetailItem(
                         iconRes = R.drawable.ic_phone,
                         label = "Mobile Number",
-                        value = user?.phoneNumber ?: "Not specified"
+                        value = user?.phoneNumber?.takeIf { it.isNotBlank() && !it.equals("EMPTY", ignoreCase = true) } ?: "Not specified"
                     )
 
                     HorizontalDivider(

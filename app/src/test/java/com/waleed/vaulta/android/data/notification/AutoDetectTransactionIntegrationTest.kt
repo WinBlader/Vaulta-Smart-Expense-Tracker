@@ -54,6 +54,10 @@ class AutoDetectTransactionIntegrationTest {
             // no-op in test fake
         }
 
+        override suspend fun syncAllCloudData(userId: String) {
+            // no-op in test fake
+        }
+
         override suspend fun clearCurrentUserData() {
             listFlow.value = emptyList()
         }

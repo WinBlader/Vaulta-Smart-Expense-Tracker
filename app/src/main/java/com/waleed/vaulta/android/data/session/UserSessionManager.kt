@@ -126,6 +126,7 @@ class UserSessionManager @Inject constructor(
         val name = prefs.getString(KEY_USER_NAME, "") ?: ""
         val email = prefs.getString(KEY_USER_EMAIL, "") ?: ""
         val phone = prefs.getString(KEY_USER_PHONE, "") ?: ""
+        val cleanPhone = if (phone.equals("EMPTY", ignoreCase = true)) "" else phone
         val provider = prefs.getString(KEY_AUTH_PROVIDER, "Supabase Auth (Verified)") ?: "Supabase Auth (Verified)"
         val isVerified = prefs.getBoolean(KEY_IS_VERIFIED, true)
         val registeredAt = prefs.getLong(KEY_REGISTERED_AT, System.currentTimeMillis())
@@ -133,7 +134,7 @@ class UserSessionManager @Inject constructor(
             id = id,
             name = name,
             email = email,
-            phoneNumber = phone,
+            phoneNumber = cleanPhone,
             authProvider = provider,
             isVerified = isVerified,
             registeredAt = registeredAt
@@ -157,9 +158,12 @@ class UserSessionManager @Inject constructor(
             else -> user.email.substringBefore("@")
         }
 
+        val cleanUserPhone = if (user.phoneNumber.equals("EMPTY", ignoreCase = true)) "" else user.phoneNumber
+        val cleanExistingPhone = if (existing?.phoneNumber?.equals("EMPTY", ignoreCase = true) == true) "" else (existing?.phoneNumber ?: "")
+
         val resolvedPhone = when {
-            user.phoneNumber.isNotBlank() -> user.phoneNumber
-            existing != null && existing.phoneNumber.isNotBlank() -> existing.phoneNumber
+            cleanUserPhone.isNotBlank() -> cleanUserPhone
+            cleanExistingPhone.isNotBlank() -> cleanExistingPhone
             else -> ""
         }
 
@@ -185,7 +189,11 @@ class UserSessionManager @Inject constructor(
         saveRegisteredAccount(toSave)
     }
 
-    fun updateUser(name: String, email: String, phoneNumber: String) {
+    fun updateUser(
+        name: String = _currentUser.value?.name ?: "",
+        email: String = _currentUser.value?.email ?: "",
+        phoneNumber: String = _currentUser.value?.phoneNumber ?: ""
+    ) {
         val currentId = _currentUser.value?.id ?: ""
         val currentProvider = _currentUser.value?.authProvider ?: "Supabase Auth (Verified)"
         val isVerified = _currentUser.value?.isVerified ?: true

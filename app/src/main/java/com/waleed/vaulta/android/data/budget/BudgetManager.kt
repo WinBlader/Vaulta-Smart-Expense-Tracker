@@ -6,6 +6,7 @@ import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,11 +98,13 @@ class BudgetManager @Inject constructor(
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val client = com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.client
+                    val currentAuthUser = client.auth.currentUserOrNull()
+                    val targetId = currentAuthUser?.id ?: userKey
                     client.from("profiles").update(
                         mapOf("monthly_budget" to validAmount)
                     ) {
                         filter {
-                            eq("id", userKey)
+                            eq("id", targetId)
                         }
                     }
                 } catch (_: Exception) {}
@@ -117,6 +120,23 @@ class BudgetManager @Inject constructor(
             .remove("budget_last_negative_balance_notified_$userKey")
             .apply()
         _monthlyBudget.value = 0.0
+
+        if (userKey != "guest" && userKey.isNotBlank() && com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.isConfigured()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val client = com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.client
+                    val currentAuthUser = client.auth.currentUserOrNull()
+                    val targetId = currentAuthUser?.id ?: userKey
+                    client.from("profiles").update(
+                        mapOf("monthly_budget" to 0.0)
+                    ) {
+                        filter {
+                            eq("id", targetId)
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun calculateCurrentMonthSpends(expenses: List<ExpenseEntity>): Double {

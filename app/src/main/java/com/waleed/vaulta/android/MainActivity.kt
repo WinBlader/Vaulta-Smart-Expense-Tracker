@@ -17,11 +17,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider
 import com.waleed.vaulta.android.data.repository.AuthRepository
 import com.waleed.vaulta.android.ui.theme.ExpenseTrackerAndroidTheme
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.jan.supabase.auth.handleDeeplinks
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -29,6 +33,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var authRepository: AuthRepository
+
+    @Inject
+    lateinit var expenseRepository: com.waleed.vaulta.android.data.repository.ExpenseRepository
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -44,6 +51,13 @@ class MainActivity : ComponentActivity() {
         try {
             SupabaseClientProvider.client.handleDeeplinks(intent)
         } catch (_: Exception) {}
+
+        // Trigger cloud sync and reinstall restoration on app launch if authenticated
+        if (authRepository.isLoggedIn()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                expenseRepository.syncUserTransactions()
+            }
+        }
 
         // Request POST_NOTIFICATIONS permission for Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

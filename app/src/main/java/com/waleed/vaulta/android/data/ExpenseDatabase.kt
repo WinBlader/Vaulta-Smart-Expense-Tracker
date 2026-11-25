@@ -11,7 +11,7 @@ import com.waleed.vaulta.android.data.model.ExpenseEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
-@Database(entities = [ExpenseEntity::class], version = 4, exportSchema = false)
+@Database(entities = [ExpenseEntity::class], version = 5, exportSchema = false)
 @Singleton
 abstract class ExpenseDatabase : RoomDatabase() {
 
@@ -30,7 +30,7 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     ExpenseDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
@@ -79,5 +79,11 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
 val MIGRATION_3_4 = object : Migration(3, 4) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE expense_table ADD COLUMN note TEXT DEFAULT NULL")
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE expense_table ADD COLUMN uuid TEXT NOT NULL DEFAULT ''")
     }
 }

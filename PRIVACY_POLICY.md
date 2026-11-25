@@ -1,6 +1,6 @@
 # Privacy Policy for Vaulta - Smart Expense Tracker
 
-**Last updated:** November 24th, 2026
+**Last updated:** November 25th, 2026
 
 **Vaulta - Smart Expense Tracker** ("Vaulta", "we", "us", or "our"), developed by winblader.org, respects your privacy and is committed to protecting the personal data of our users. This Privacy Policy explains how your information is collected, used, and stored when you use the Vaulta Android application (`com.waleed.vaulta.android`).
 
@@ -12,14 +12,14 @@
 When you choose to register or sign in using Email or Google Sign-In, we collect:
 - **Name / Display Name:** Used to personalize your dashboard greeting.
 - **Email Address:** Used as your account identifier and for account recovery.
-- **Phone Number (Optional):** If provided during registration or profile update.
+- **Phone Number (Optional):** If provided during registration or profile update (never stored as placeholders; blank values remain empty).
 
 > **Guest Mode:** If you choose **"Continue as Guest"**, no personal information (name, email, phone) is collected or transmitted to any server.
 
 ### B. Financial & Expense Data
-- **Transaction Records:** Titles, amounts, categories, dates, and types (Expense or Income).
-- **Budget Settings:** Monthly budget caps and spending limits.
-- **Storage:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend (Supabase) so you can access it across devices.
+- **Transaction & Credit/Owe Records:** Titles, amounts, categories, dates, transaction types (Expense, Income, Owed to You, or You Owe), payment methods, and optional transaction notes.
+- **Budget & Regional Preferences:** Monthly budget caps, spending limits, and selected currency preference (`currency_code`).
+- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, notes, monthly budget, and currency preference synchronize with our secure cloud database (Supabase) protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.
@@ -56,7 +56,7 @@ We do **not** use third-party advertising SDKs, and we do **not** sell, rent, or
 You maintain complete ownership of your data:
 - **Transaction Editing & Modification:** You can edit and update any logged transaction (including title, amount, type, and date) at any time directly in the app. Edits persist immediately to your local database and sync securely to your account.
 - **Individual Transaction Deletion:** You can delete any individual expense or income entry at any time via Swipe-to-Delete on the Home or Transaction List screens, or via the Delete button inside the Transaction Receipt dialog. A brief "Undo" action allows instant recovery if dismissed by mistake.
-- **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`.
+- **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`. When signed in, this also permanently purges all remote transactions from Supabase and resets your cloud monthly budget to `0.0`.
 - **Operating System Deletion:** You can erase all locally stored data at any time by clearing the application's storage in your Android device's Settings (`Settings > Apps > Vaulta > Storage > Clear Data`) or by uninstalling the application.
 - **Account & Cloud Data Deletion:** To request the permanent deletion of your cloud account and associated profile data from our servers, send an email to **winblader.org@gmail.com** with the subject *"Account Deletion Request"*. Your account and data will be permanently removed within 30 days.
 

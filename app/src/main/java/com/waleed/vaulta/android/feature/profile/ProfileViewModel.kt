@@ -109,7 +109,8 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun onCurrencySelected(currency: CurrencyItem) {
-        CurrencyManager.setCurrency(currency)
+        val userKey = sessionManager.getCurrentUserKey()
+        CurrencyManager.setCurrency(currency, userKey)
     }
 
     override fun onEvent(event: UiEvent) {
@@ -173,7 +174,7 @@ class ProfileViewModel @Inject constructor(
                     isEditing = true,
                     editName = currentUser?.name ?: "",
                     editEmail = currentUser?.email ?: "",
-                    editPhone = currentUser?.phoneNumber ?: "",
+                    editPhone = currentUser?.phoneNumber?.takeIf { it.isNotBlank() && !it.equals("EMPTY", ignoreCase = true) } ?: "",
                     message = null
                 )
             }
@@ -232,7 +233,8 @@ class ProfileViewModel @Inject constructor(
             }
 
             is ProfileUiEvent.OnCurrencySelected -> {
-                CurrencyManager.setCurrency(event.currency)
+                val userKey = sessionManager.getCurrentUserKey()
+                CurrencyManager.setCurrency(event.currency, userKey)
             }
 
             is ProfileUiEvent.OnRequestLogout -> {

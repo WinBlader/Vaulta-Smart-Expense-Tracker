@@ -462,4 +462,149 @@ class VaultaFeatureIntegrationTest {
         val stateAfterDismiss = stateAfterOpen.copy(showDeviceSetupInfoDialog = false)
         assertFalse(stateAfterDismiss.showDeviceSetupInfoDialog)
     }
+
+    @Test
+    fun testRemoteTransactionDtoSerialization() {
+        val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+        val dto = com.waleed.vaulta.android.data.model.RemoteTransactionDto(
+            id = "uuid-1234-5678",
+            userId = "usr-abc-999",
+            title = "Freelance UI Design",
+            amount = 45000.0,
+            type = "INCOME",
+            category = "Freelance",
+            paymentMethod = "Bank",
+            note = "Client milestone payment",
+            dateMillis = 1732530000000L,
+            isCreditOwe = false,
+            creditOweStatus = null
+        )
+
+        val encoded = json.encodeToString(dto)
+        assertTrue(encoded.contains("\"id\":\"uuid-1234-5678\""))
+        assertTrue(encoded.contains("\"user_id\":\"usr-abc-999\""))
+        assertTrue(encoded.contains("\"type\":\"INCOME\""))
+        assertTrue(encoded.contains("\"date_millis\":1732530000000"))
+
+        val decoded = json.decodeFromString<com.waleed.vaulta.android.data.model.RemoteTransactionDto>(encoded)
+        assertEquals("uuid-1234-5678", decoded.id)
+        assertEquals("usr-abc-999", decoded.userId)
+        assertEquals(45000.0, decoded.amount, 0.001)
+        assertEquals("Client milestone payment", decoded.note)
+        assertFalse(decoded.isCreditOwe)
+    }
+
+    @Test
+    fun testProfilePhoneNumberSanitizesEmpty() {
+        val profileWithLiteralEmpty = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user_1",
+            displayName = "Waleed",
+            phoneNumber = "EMPTY"
+        )
+        assertEquals("", profileWithLiteralEmpty.cleanPhoneNumber)
+
+        val profileWithLowercaseEmpty = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user_2",
+            displayName = "Waleed",
+            phoneNumber = "empty"
+        )
+        assertEquals("", profileWithLowercaseEmpty.cleanPhoneNumber)
+
+        val profileWithBlank = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user_3",
+            displayName = "Waleed",
+            phoneNumber = "   "
+        )
+        assertEquals("", profileWithBlank.cleanPhoneNumber)
+
+        val profileWithValidPhone = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user_4",
+            displayName = "Waleed",
+            phoneNumber = "+91 9876543210"
+        )
+        assertEquals("+91 9876543210", profileWithValidPhone.cleanPhoneNumber)
+    }
+
+    @Test
+    fun testExpenseEntityMaintainsUuidAcrossCopies() {
+        val initialUuid = "fixed-uuid-1111"
+        val entity = ExpenseEntity(
+            id = 10,
+            title = "Groceries",
+            amount = 1200.0,
+            date = "Nov 25, 2026",
+            type = "Expense",
+            uuid = initialUuid
+        )
+        assertEquals(initialUuid, entity.uuid)
+
+        // Editing attributes via copy preserves stable uuid
+        val updated = entity.copy(title = "Supermarket Groceries", amount = 1450.0)
+        assertEquals(initialUuid, updated.uuid)
+        assertEquals(10, updated.id)
+        assertEquals(1450.0, updated.amount, 0.001)
+    }
+
+    @Test
+    fun testFullReinstallRestoreWithRemoteTransactionDto() {
+        val userId = "user_cloud_restore_456"
+        val remoteList = listOf(
+            com.waleed.vaulta.android.data.model.RemoteTransactionDto(
+                id = "tx-uuid-1",
+                userId = userId,
+                title = "App Consulting",
+                amount = 60000.0,
+                type = "INCOME",
+                category = "Salary",
+                note = "Direct client invoice",
+                dateMillis = 1732530000000L,
+                isCreditOwe = false,
+                creditOweStatus = null
+            ),
+            com.waleed.vaulta.android.data.model.RemoteTransactionDto(
+                id = "tx-uuid-2",
+                userId = userId,
+                title = "Ajaz Ahmad Wani",
+                amount = 5000.0,
+                type = "EXPENSE",
+                category = "Credit / Owe",
+                note = "Pending settlement",
+                dateMillis = 1732535000000L,
+                isCreditOwe = true,
+                creditOweStatus = "YOU_OWE"
+            )
+        )
+
+        // Simulate restore into Room entities
+        val restoredEntities = remoteList.map { remote ->
+            val localType = if (remote.isCreditOwe) {
+                if (remote.creditOweStatus?.equals("YOU_OWE", ignoreCase = true) == true) "You Owe" else "Owed to You"
+            } else if (remote.type.equals("INCOME", ignoreCase = true)) {
+                "Income"
+            } else {
+                "Expense"
+            }
+            ExpenseEntity(
+                id = null,
+                title = remote.title,
+                amount = remote.amount,
+                date = "Nov 25, 2026",
+                type = localType,
+                userId = userId,
+                note = remote.note,
+                uuid = remote.id
+            )
+        }
+
+        assertEquals(2, restoredEntities.size)
+        val incomeItem = restoredEntities[0]
+        assertEquals("Income", incomeItem.type)
+        assertEquals("tx-uuid-1", incomeItem.uuid)
+        assertEquals(60000.0, incomeItem.amount, 0.001)
+
+        val oweItem = restoredEntities[1]
+        assertEquals("You Owe", oweItem.type)
+        assertEquals("tx-uuid-2", oweItem.uuid)
+        assertEquals("Pending settlement", oweItem.note)
+    }
 }

@@ -73,4 +73,13 @@ interface ExpenseDao {
 
     @Query("UPDATE expense_table SET userId = :userId WHERE userId = '' OR userId IS NULL OR userId = 'guest'")
     suspend fun claimGuestExpenses(userId: String)
+
+    @Query("SELECT * FROM expense_table WHERE uuid = :uuid LIMIT 1")
+    suspend fun getExpenseByUuid(uuid: String): ExpenseEntity?
+
+    @Query("UPDATE expense_table SET uuid = :uuid WHERE id = :id")
+    suspend fun updateExpenseUuid(id: Int, uuid: String)
+
+    @Query("DELETE FROM expense_table WHERE uuid = :uuid")
+    suspend fun deleteExpenseByUuid(uuid: String)
 }

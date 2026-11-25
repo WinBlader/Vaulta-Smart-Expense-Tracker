@@ -73,14 +73,17 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     amount NUMERIC(14, 2) NOT NULL,
-    type TEXT NOT NULL DEFAULT 'Expense',
-    category TEXT,
+    type TEXT NOT NULL DEFAULT 'EXPENSE',
+    category TEXT NOT NULL DEFAULT 'General',
     payment_method TEXT,
     note TEXT,
+    date_millis BIGINT NOT NULL DEFAULT (extract(epoch from now()) * 1000)::bigint,
+    is_credit_owe BOOLEAN DEFAULT FALSE,
+    credit_owe_status TEXT,
     credit_direction TEXT,
     counterparty_name TEXT,
     timestamp BIGINT,
-    date TEXT NOT NULL,
+    date TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -89,13 +92,22 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='category') THEN
-        ALTER TABLE public.transactions ADD COLUMN category TEXT;
+        ALTER TABLE public.transactions ADD COLUMN category TEXT DEFAULT 'General';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='payment_method') THEN
         ALTER TABLE public.transactions ADD COLUMN payment_method TEXT;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='note') THEN
         ALTER TABLE public.transactions ADD COLUMN note TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='date_millis') THEN
+        ALTER TABLE public.transactions ADD COLUMN date_millis BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='is_credit_owe') THEN
+        ALTER TABLE public.transactions ADD COLUMN is_credit_owe BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='credit_owe_status') THEN
+        ALTER TABLE public.transactions ADD COLUMN credit_owe_status TEXT;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='credit_direction') THEN
         ALTER TABLE public.transactions ADD COLUMN credit_direction TEXT;

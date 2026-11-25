@@ -3,6 +3,7 @@ package com.waleed.vaulta.android.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.waleed.vaulta.android.data.model.CurrencyItem
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -147,11 +148,12 @@ object CurrencyManager {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val client = com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.client
+                    val targetId = client.auth.currentUserOrNull()?.id ?: userKey
                     client.from("profiles").update(
                         mapOf("currency_code" to currency.code)
                     ) {
                         filter {
-                            eq("id", userKey)
+                            eq("id", targetId)
                         }
                     }
                 } catch (_: Exception) {}
