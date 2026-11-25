@@ -418,7 +418,7 @@ fun SpendsDashboardScreen(
                         ) {
                             Text(
                                 text = "No category spends recorded yet",
-                                fontSize = 11.sp,
+                                fontSize = 13.sp,
                                 color = LightGrey
                             )
                         }
@@ -534,7 +534,7 @@ fun CategorySpendRow(item: CategorySpendItem) {
                 if (item.percentage > 0) {
                     Text(
                         text = "${String.format(Locale.getDefault(), "%.1f", item.percentage)}% of total spends",
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         color = LightGrey
                     )
                 }

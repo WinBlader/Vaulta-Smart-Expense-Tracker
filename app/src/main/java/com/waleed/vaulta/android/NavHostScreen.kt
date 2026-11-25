@@ -3,7 +3,10 @@ package com.waleed.vaulta.android
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBarItem
@@ -133,7 +136,7 @@ fun NavHostScreen(
         VaultaSnackbarHost(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = if (bottomBarVisibility) 92.dp else 24.dp)
+                .padding(bottom = if (bottomBarVisibility) 74.dp else 24.dp)
                 .zIndex(999f)
         )
     }
@@ -150,13 +153,17 @@ fun NavigationBottomBar(
     navController: NavController,
     items: List<NavItem>
 ) {
-    // Bottom Navigation Bar
+    // Bottom Navigation Bar - Slim & Compact (62.dp)
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
     BottomAppBar(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(62.dp),
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-        contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+        contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp
     ) {
         items.forEach { item ->
             NavigationBarItem(
@@ -171,7 +178,11 @@ fun NavigationBottomBar(
                     }
                 },
                 icon = {
-                    Icon(painter = painterResource(id = item.icon), contentDescription = null)
+                    Icon(
+                        painter = painterResource(id = item.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
                 },
                 alwaysShowLabel = false,
                 colors = NavigationBarItemDefaults.colors(

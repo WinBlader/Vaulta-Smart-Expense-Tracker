@@ -6,6 +6,7 @@ import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,6 +90,22 @@ class BudgetManager @Inject constructor(
 
         if (currentExpenses.isNotEmpty() && validAmount > 0.0) {
             checkBudgetAndNotify(currentExpenses)
+        }
+
+        val userKey = sessionManager.getCurrentUserKey()
+        if (userKey != "guest" && userKey.isNotBlank() && com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.isConfigured()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val client = com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.client
+                    client.from("profiles").update(
+                        mapOf("monthly_budget" to validAmount)
+                    ) {
+                        filter {
+                            eq("id", userKey)
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 

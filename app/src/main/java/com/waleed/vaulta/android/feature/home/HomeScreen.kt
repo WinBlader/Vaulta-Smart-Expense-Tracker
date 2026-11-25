@@ -548,12 +548,12 @@ fun TransactionList(
                                 ) {
                                     Text(
                                         text = "$percentUsed% of ${Utils.formatCurrency(monthlyBudget)}",
-                                        fontSize = 11.sp,
+                                        fontSize = 13.sp,
                                         color = LightGrey
                                     )
                                     Text(
                                         text = if (isExceeded) "⚠️ Budget Exceeded" else "${Utils.formatCurrency((monthlyBudget - spendsThisMonth).coerceAtLeast(0.0))} left",
-                                        fontSize = 11.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isExceeded) Red else Green
                                     )
@@ -718,7 +718,7 @@ fun TransactionItem(
                     ) {
                         Text(
                             text = badgeText,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFF59E0B),
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)

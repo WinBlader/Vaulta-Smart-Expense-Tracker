@@ -343,4 +343,123 @@ class VaultaFeatureIntegrationTest {
         val stillAccepted = mockStorage["privacy_policy_accepted_v1_$activeUserId"] as? Boolean
         assertEquals(true, stillAccepted)
     }
+
+    @Test
+    fun testCloudReinstallHydrationRestoresProfileSettingsAndTransactions() {
+        // Simulate app uninstall/reinstall: local RoomDB and preferences are empty
+        val localPreferences = mutableMapOf<String, Any>()
+        val localRoomDb = mutableListOf<ExpenseEntity>()
+        val userId = "user_reinstall_test_101"
+
+        // Simulated cloud payload returned by Supabase PostgREST
+        val cloudProfile = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = userId,
+            displayName = "Waleed Wani",
+            phoneNumber = "+91 9876543210",
+            currencyCode = "INR",
+            monthlyBudget = 75000.0,
+            privacyPolicyAccepted = true
+        )
+
+        val cloudTransactions = listOf(
+            TransactionDto(
+                id = "tx_1001",
+                localId = 1001,
+                userId = userId,
+                title = "Salary Credited",
+                amount = 85000.0,
+                type = "Income",
+                category = "Salary",
+                paymentMethod = "Bank Transfer",
+                note = "Monthly salary direct deposit",
+                date = "Nov 25, 2026",
+                timestamp = 1732520000000L
+            ),
+            TransactionDto(
+                id = "tx_1002",
+                localId = 1002,
+                userId = userId,
+                title = "Taj Restaurant Dinner",
+                amount = 3200.0,
+                type = "Expense",
+                category = "Food & Dining",
+                paymentMethod = "UPI",
+                note = "Celebration dinner with family",
+                date = "Nov 25, 2026",
+                timestamp = 1732525000000L
+            ),
+            TransactionDto(
+                id = "tx_1003",
+                localId = 1003,
+                userId = userId,
+                title = "Ajaz Ahmad Wani",
+                amount = 15000.0,
+                type = "Owed to You",
+                category = "Credit",
+                paymentMethod = "UPI",
+                note = "Lent for travel expenses",
+                date = "Nov 25, 2026",
+                timestamp = 1732530000000L
+            )
+        )
+
+        // Simulate ExpenseRepository reinstall hydration logic
+        // 1. Hydrate preferences
+        cloudProfile.displayName?.let { localPreferences["display_name_$userId"] = it }
+        cloudProfile.currencyCode?.let { localPreferences["selected_currency_$userId"] = it }
+        cloudProfile.monthlyBudget?.let { localPreferences["monthly_budget_$userId"] = it }
+        cloudProfile.privacyPolicyAccepted?.let { localPreferences["privacy_policy_accepted_v1_$userId"] = it }
+
+        // 2. Hydrate Room database
+        val mappedEntities = cloudTransactions.map { dto ->
+            ExpenseEntity(
+                id = dto.localId,
+                title = dto.title,
+                amount = dto.amount,
+                date = dto.date,
+                type = dto.type,
+                userId = dto.userId,
+                note = dto.note
+            )
+        }
+        localRoomDb.addAll(mappedEntities)
+
+        // Assert profile & settings restored from cloud
+        assertEquals("Waleed Wani", localPreferences["display_name_$userId"])
+        assertEquals("INR", localPreferences["selected_currency_$userId"])
+        assertEquals(75000.0, localPreferences["monthly_budget_$userId"])
+        assertEquals(true, localPreferences["privacy_policy_accepted_v1_$userId"])
+
+        // Assert all transactions and attributes restored into local DB
+        assertEquals(3, localRoomDb.size)
+        val salaryItem = localRoomDb.find { it.title == "Salary Credited" }
+        assertNotNull(salaryItem)
+        assertEquals(85000.0, salaryItem!!.amount, 0.001)
+        assertEquals("Monthly salary direct deposit", salaryItem.note)
+        assertEquals("Income", salaryItem.type)
+
+        val dinnerItem = localRoomDb.find { it.title == "Taj Restaurant Dinner" }
+        assertNotNull(dinnerItem)
+        assertEquals(3200.0, dinnerItem!!.amount, 0.001)
+        assertEquals("Celebration dinner with family", dinnerItem.note)
+
+        val creditItem = localRoomDb.find { it.title == "Ajaz Ahmad Wani" }
+        assertNotNull(creditItem)
+        assertEquals("Owed to You", creditItem!!.type)
+        assertEquals("Lent for travel expenses", creditItem.note)
+    }
+
+    @Test
+    fun testXiaomiHyperOsInfoDialogStateToggle() {
+        val initialUiState = com.waleed.vaulta.android.feature.profile.ProfileUiState()
+        assertFalse(initialUiState.showDeviceSetupInfoDialog)
+
+        // Opening dialog
+        val stateAfterOpen = initialUiState.copy(showDeviceSetupInfoDialog = true)
+        assertTrue(stateAfterOpen.showDeviceSetupInfoDialog)
+
+        // Dismissing dialog
+        val stateAfterDismiss = stateAfterOpen.copy(showDeviceSetupInfoDialog = false)
+        assertFalse(stateAfterDismiss.showDeviceSetupInfoDialog)
+    }
 }

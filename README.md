@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.5%20(Build%2011)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.5"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.6%20(Build%2012)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.6"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -76,15 +76,16 @@
 - **Category Progress Bars:** Proportional horizontal progress bars illustrating the exact percentage split consumed by each category.
 - **Monthly Budget Ceilings:** Set monthly spending targets with automatic alerts when approaching 80% or exceeding 100%.
 
-### 5. 🔐 Flexible Authentication & Cloud Sync
+### 5. 🔐 Flexible Authentication & Full Cloud Backup / Restore Across Reinstall
 - **Multi-Method Sign-In:** Sign in using Email, Google One-Tap, or Mobile Number.
 - **Editable International Calling Code:** Mobile login and registration feature a side-by-side editable country code input (defaulting to `+91`, supporting all global codes like `+1`, `+44`, `+971`) with E.164 normalization.
-- **100% Offline Guest Mode:** Use all core features anonymously without creating an account or uploading data to the cloud.
+- **Full Cloud Backup & Restore on Reinstall:** Authenticated profiles and transaction data synchronize securely with PostgreSQL on Supabase protected by Row Level Security (`auth.uid() = user_id`). Uninstalling and reinstalling the app and logging back in immediately restores 100% of user profile details (`displayName`, `phoneNumber`, `currencyCode`, `monthlyBudget`, `privacyPolicyAccepted`) and all historical transactions directly into local RoomDB and preferences.
+- **100% Offline Guest Mode:** Use all core features anonymously without creating an account or uploading data to the cloud; Guest Mode makes zero network calls.
 - **Strict Multi-Account Isolation:** Database queries partition transactions strictly by user ID (`WHERE userId = :userId`), and signing out automatically purges local cached records so accounts on the same device never leak or mix data.
-- **Cloud Backend Sync:** Authenticated profiles and transaction data synchronize securely with PostgreSQL on Supabase protected by Row Level Security (RLS).
 
 ### 6. ⚡ Smart Auto-Detect Transactions (Privacy-First On-Device, SMS-Only)
 - **Automatic Payment Logging from SMS:** Optional, strictly opt-in feature using Android's `NotificationListenerService` to automatically record income and expenses from official bank and payment SMS text messages.
+- **Clean Native Material 3 Badge & Setup Info Tooltip:** Replaced heavy pill containers with a clean, native Material 3 status badge (`Active & Connected` / `Access Required`). Device setup instructions (including Xiaomi/HyperOS Autostart and Battery Saver guidance) are accessible via a subtle information tooltip dialog next to the section title.
 - **Strict SMS-Only Allowlist:** Dynamically inspects the system default SMS app (`Telephony.Sms.getDefaultSmsPackage`) and recognized messaging apps (`com.google.android.apps.messaging`, `com.android.mms`, `com.samsung.android.messaging`, `com.miui.mms`, `com.microsoft.android.smsorganizer`, etc.). Explicitly blocks and ignores social and chat apps like WhatsApp, Telegram, Instagram, Discord, Slack, etc., ensuring casual chat conversations are never logged.
 - **Financial Context Validation:** Employs strict structural validation requiring legitimate banking/transaction indicators (A/c, card ending, UPI, ref, balance, debited/credited) to guarantee casual texts mentioning currency or numbers are safely rejected.
 - **Multi-Currency Parser:** Extracts amounts in global formats and currencies (`₹`, `Rs.`, `$`, `USD`, `€`, `EUR`, `£`, `GBP`, `AED`, `SAR`, etc.) including European comma formats (`€19,99`).
@@ -92,6 +93,7 @@
 - **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
 - **Intelligent Deduplication & Direction Protection:** 25-second rolling window prevents duplicate entries across simultaneous SMS alerts, and guarantees that incoming credit alerts (e.g. "X paid you", "sent you", "received from", "credited") are strictly classified as Income and never produce duplicate or contradictory Expense rows.
 - **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"AJAZ Ahmad WANI Paid You 101.00"` to `"AJAZ Ahmad WANI"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
+- **Slimmer Navigation & Standardized Typography:** Refined bottom navigation bar to a sleek 62dp height with compact padding, and standardized typography across all screens (14sp–16sp standard body/labels) eliminating uncomfortably small text.
 
 ### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
 - **Swipe-to-Delete:** Effortlessly dismiss any transaction from the Home feed or the full Transaction List using Material 3 `SwipeToDismissBox` with custom red warning backgrounds and trash icons.

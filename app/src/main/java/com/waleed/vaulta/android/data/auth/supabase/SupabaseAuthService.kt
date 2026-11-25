@@ -1,6 +1,7 @@
 package com.waleed.vaulta.android.data.auth.supabase
 
 import android.util.Log
+import com.waleed.vaulta.android.data.CurrencyManager
 import com.waleed.vaulta.android.data.model.ProfileDto
 import com.waleed.vaulta.android.data.model.UserProfile
 import com.waleed.vaulta.android.data.session.UserSessionManager
@@ -91,10 +92,14 @@ class SupabaseAuthService @Inject constructor(
             val profile = ProfileDto(
                 id = userId,
                 username = cleanUsername,
+                displayName = cleanUsername,
                 fullName = cleanUsername,
                 email = cleanEmail,
                 phoneNumber = cleanPhone,
                 authProvider = "Email",
+                currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
+                monthlyBudget = 0.0,
+                privacyPolicyAccepted = false,
                 updatedAt = nowStr
             )
 
@@ -347,10 +352,14 @@ class SupabaseAuthService @Inject constructor(
             val profile = ProfileDto(
                 id = userId,
                 username = resolvedName,
+                displayName = resolvedName,
                 fullName = resolvedName,
                 email = resolvedEmail,
                 phoneNumber = "",
                 authProvider = "Google",
+                currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
+                monthlyBudget = 0.0,
+                privacyPolicyAccepted = false,
                 updatedAt = nowStr
             )
             try {
@@ -572,11 +581,15 @@ class SupabaseAuthService @Inject constructor(
                 val updatedProfile = ProfileDto(
                     id = userId,
                     username = cleanName.ifBlank { currentSession?.name ?: "" },
+                    displayName = cleanName.ifBlank { currentSession?.name ?: "" },
                     fullName = cleanName.ifBlank { currentSession?.name ?: "" },
                     email = if (cleanEmail.isNotBlank()) cleanEmail else (existingProfile?.email ?: currentUser.email ?: ""),
                     phoneNumber = cleanPhone,
                     authProvider = existingProfile?.authProvider ?: currentSession?.authProvider ?: "Supabase Auth (Verified)",
                     avatarUrl = existingProfile?.avatarUrl,
+                    currencyCode = existingProfile?.currencyCode ?: CurrencyManager.getSelectedCurrency().code,
+                    monthlyBudget = existingProfile?.monthlyBudget,
+                    privacyPolicyAccepted = existingProfile?.privacyPolicyAccepted ?: sessionManager.isPrivacyPolicyAccepted(userId),
                     updatedAt = nowStr
                 )
                 client.from("profiles").upsert(updatedProfile)

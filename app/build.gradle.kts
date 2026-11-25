@@ -27,8 +27,8 @@ android {
         applicationId = "com.waleed.vaulta.android"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.4.5"
+        versionCode = 12
+        versionName = "1.4.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.constraintlayout)
     implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
     testImplementation(libs.junit)

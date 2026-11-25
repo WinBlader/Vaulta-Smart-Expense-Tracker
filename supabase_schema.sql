@@ -8,40 +8,139 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     username TEXT,
+    display_name TEXT,
     full_name TEXT,
     email TEXT,
     phone_number TEXT,
     avatar_url TEXT,
     auth_provider TEXT DEFAULT 'Email',
+    currency_code TEXT DEFAULT 'INR',
+    monthly_budget NUMERIC(14, 2) DEFAULT 0.00,
+    privacy_policy_accepted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Ensure newer columns exist if migrating an existing database
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='display_name') THEN
+        ALTER TABLE public.profiles ADD COLUMN display_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='currency_code') THEN
+        ALTER TABLE public.profiles ADD COLUMN currency_code TEXT DEFAULT 'INR';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='monthly_budget') THEN
+        ALTER TABLE public.profiles ADD COLUMN monthly_budget NUMERIC(14, 2) DEFAULT 0.00;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='privacy_policy_accepted') THEN
+        ALTER TABLE public.profiles ADD COLUMN privacy_policy_accepted BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+
 -- 2. Enable Row Level Security (RLS) on the profiles table
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- 3. Policy: Allow users to view their own profile
+-- 3. Policies for profiles
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
     ON public.profiles
     FOR SELECT
     USING (auth.uid() = id);
 
--- 4. Policy: Allow users to insert their own profile
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
     ON public.profiles
     FOR INSERT
     WITH CHECK (auth.uid() = id);
 
--- 5. Policy: Allow users to update their own profile
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles
     FOR UPDATE
     USING (auth.uid() = id);
 
--- 6. Function: Automatic profile creation trigger on new user signup
+DROP POLICY IF EXISTS "Users can delete their own profile" ON public.profiles;
+CREATE POLICY "Users can delete their own profile"
+    ON public.profiles
+    FOR DELETE
+    USING (auth.uid() = id);
+
+-- 4. Create transactions table for Cloud Backup & Sync
+CREATE TABLE IF NOT EXISTS public.transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    local_id BIGINT,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    amount NUMERIC(14, 2) NOT NULL,
+    type TEXT NOT NULL DEFAULT 'Expense',
+    category TEXT,
+    payment_method TEXT,
+    note TEXT,
+    credit_direction TEXT,
+    counterparty_name TEXT,
+    timestamp BIGINT,
+    date TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Ensure newer columns exist if migrating an existing database
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='category') THEN
+        ALTER TABLE public.transactions ADD COLUMN category TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='payment_method') THEN
+        ALTER TABLE public.transactions ADD COLUMN payment_method TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='note') THEN
+        ALTER TABLE public.transactions ADD COLUMN note TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='credit_direction') THEN
+        ALTER TABLE public.transactions ADD COLUMN credit_direction TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='counterparty_name') THEN
+        ALTER TABLE public.transactions ADD COLUMN counterparty_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='timestamp') THEN
+        ALTER TABLE public.transactions ADD COLUMN timestamp BIGINT;
+    END IF;
+END $$;
+
+-- 5. Enable Row Level Security (RLS) on transactions
+ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+
+-- 6. Policies for transactions (auth.uid() = user_id)
+DROP POLICY IF EXISTS "Users can view their own transactions" ON public.transactions;
+CREATE POLICY "Users can view their own transactions"
+    ON public.transactions
+    FOR SELECT
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert their own transactions" ON public.transactions;
+CREATE POLICY "Users can insert their own transactions"
+    ON public.transactions
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own transactions" ON public.transactions;
+CREATE POLICY "Users can update their own transactions"
+    ON public.transactions
+    FOR UPDATE
+    USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own transactions" ON public.transactions;
+CREATE POLICY "Users can delete their own transactions"
+    ON public.transactions
+    FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- 7. Indexes for performant cloud querying
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON public.transactions(user_id, date);
+
+-- 8. Function & Trigger: Automatic profile creation trigger on new user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -64,23 +163,32 @@ BEGIN
     INSERT INTO public.profiles (
         id,
         username,
+        display_name,
         full_name,
         email,
         phone_number,
         auth_provider,
+        currency_code,
+        monthly_budget,
+        privacy_policy_accepted,
         updated_at
     )
     VALUES (
         NEW.id,
         raw_user_name,
         raw_user_name,
+        raw_user_name,
         NEW.email,
         raw_phone,
         COALESCE(NEW.raw_app_meta_data->>'provider', 'Email'),
+        COALESCE(NEW.raw_user_meta_data->>'currency_code', 'INR'),
+        COALESCE((NEW.raw_user_meta_data->>'monthly_budget')::NUMERIC, 0.00),
+        COALESCE((NEW.raw_user_meta_data->>'privacy_policy_accepted_v1')::BOOLEAN, FALSE),
         NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
         username = EXCLUDED.username,
+        display_name = COALESCE(public.profiles.display_name, EXCLUDED.display_name),
         full_name = EXCLUDED.full_name,
         email = EXCLUDED.email,
         phone_number = EXCLUDED.phone_number,
@@ -90,21 +198,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 7. Trigger: Trigger handle_new_user on every auth.users insert
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- 8. Optional: Sync existing users into profiles (if any exist prior to script execution)
-INSERT INTO public.profiles (id, username, full_name, email, phone_number, auth_provider, updated_at)
-SELECT
-    id,
-    COALESCE(raw_user_meta_data->>'username', raw_user_meta_data->>'full_name', split_part(email, '@', 1)),
-    COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'name', split_part(email, '@', 1)),
-    email,
-    COALESCE(raw_user_meta_data->>'phone_number', phone, ''),
-    COALESCE(raw_app_meta_data->>'provider', 'Email'),
-    NOW()
-FROM auth.users
-ON CONFLICT (id) DO NOTHING;

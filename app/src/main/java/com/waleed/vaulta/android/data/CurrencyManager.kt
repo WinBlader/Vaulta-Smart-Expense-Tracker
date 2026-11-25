@@ -3,9 +3,13 @@ package com.waleed.vaulta.android.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.waleed.vaulta.android.data.model.CurrencyItem
+import io.github.jan.supabase.postgrest.from
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 object CurrencyManager {
@@ -138,6 +142,21 @@ object CurrencyManager {
             editor?.putString("${KEY_CURRENCY_CODE}_$userKey", currency.code)
         }
         editor?.apply()
+
+        if (userKey.isNotBlank() && userKey != "guest" && com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.isConfigured()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val client = com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.client
+                    client.from("profiles").update(
+                        mapOf("currency_code" to currency.code)
+                    ) {
+                        filter {
+                            eq("id", userKey)
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun getSelectedCurrency(): CurrencyItem {

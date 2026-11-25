@@ -30,6 +30,7 @@ data class ProfileUiState(
     val editPhone: String = "",
     val showLogoutConfirm: Boolean = false,
     val showAutoDetectDisclosureDialog: Boolean = false,
+    val showDeviceSetupInfoDialog: Boolean = false,
     val showResetEverythingDialog: Boolean = false,
     val message: String? = null
 )
@@ -133,6 +134,14 @@ class ProfileViewModel @Inject constructor(
                     NotificationAccessHelper.setAutoDetectEnabled(context, false, userKey)
                     _isAutoDetectEnabled.value = false
                 }
+            }
+
+            is ProfileUiEvent.OnOpenDeviceSetupInfo -> {
+                _uiState.value = _uiState.value.copy(showDeviceSetupInfoDialog = true)
+            }
+
+            is ProfileUiEvent.OnDismissDeviceSetupInfo -> {
+                _uiState.value = _uiState.value.copy(showDeviceSetupInfoDialog = false)
             }
 
             is ProfileUiEvent.OnDismissAutoDetectDisclosure -> {
@@ -342,6 +351,8 @@ sealed class ProfileUiEvent : UiEvent() {
     data object OnDismissLogout : ProfileUiEvent()
     data object OnConfirmLogout : ProfileUiEvent()
     data object OnTestAutoDetect : ProfileUiEvent()
+    data object OnOpenDeviceSetupInfo : ProfileUiEvent()
+    data object OnDismissDeviceSetupInfo : ProfileUiEvent()
     data object OnRequestResetEverything : ProfileUiEvent()
     data object OnDismissResetEverything : ProfileUiEvent()
     data object OnConfirmResetEverything : ProfileUiEvent()

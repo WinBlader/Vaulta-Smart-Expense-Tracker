@@ -62,10 +62,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
@@ -232,9 +239,9 @@ fun ProfileScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             ExpenseTextView(
                                 text = "• Strictly SMS Only: Parses only incoming SMS text alerts from Google Messages or your default SMS app. Chat apps (WhatsApp, Telegram, Instagram, Discord, etc.) are never read.\n• 100% Local & Private: Raw SMS text is analyzed strictly in memory and is never saved, logged, or uploaded.\n• Noise & Scam Elimination: OTPs, security verification codes, ending balances, and personal chat texts are completely ignored.\n• Verified Bank Alerts: Supports standard Indian bank SMS formats (HDFC, ICICI, SBI, Axis, Kotak, etc.) and global payment SMS.",
-                                fontSize = 11.5.sp,
+                                fontSize = 13.sp,
                                 color = LightGrey,
-                                lineHeight = 16.sp
+                                lineHeight = 18.sp
                             )
                         }
                     }
@@ -250,9 +257,9 @@ fun ProfileScreen(
                     ) {
                         ExpenseTextView(
                             text = "ℹ️ Device Setup & MIUI / HyperOS Notice:\n• Android 13+ sideload: Tap 'App Info & Restricted Settings' below, open 3-dots menu (top-right), and choose 'Allow restricted settings'.\n• Xiaomi / Redmi / POCO (MIUI & HyperOS): Enable 'Autostart' and select Battery Saver 'No restrictions' in App Info for uninterrupted tracking.",
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             color = LightGrey.copy(alpha = 0.85f),
-                            lineHeight = 15.sp
+                            lineHeight = 17.sp
                         )
                     }
 
@@ -308,6 +315,147 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (uiState.showDeviceSetupInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ProfileUiEvent.OnDismissDeviceSetupInfo) },
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = Zinc,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Background & Device Setup",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "To ensure Vaulta can continuously detect incoming bank & payment SMS text notifications in the background, please verify the following device settings:",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 20.sp
+                        )
+                    )
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Xiaomi / Redmi / POCO (MIUI & HyperOS)",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Zinc
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "• Enable 'Autostart' in Vaulta App Info\n• Set Battery Saver to 'No restrictions'\n• In Notification Settings, verify Floating and Lock Screen alerts are allowed.",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    lineHeight = 20.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "Android 13+ Sideload Restricted Settings",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Zinc
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "If Android displays 'Restricted setting' when turning on Notification Access:\nOpen App Info > tap the 3-dots menu in top right corner > select 'Allow restricted settings'.",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    lineHeight = 20.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "SMS Notification Delivery",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Zinc
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Ensure notifications from your default SMS app (e.g. Google Messages or Samsung Messages) are not silenced or muted in Android system settings.",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily,
+                                    lineHeight = 20.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.onEvent(ProfileUiEvent.OnDismissDeviceSetupInfo)
+                        viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Zinc),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Open App Info", fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissDeviceSetupInfo) }
+                ) {
+                    Text("Got it", fontFamily = com.waleed.vaulta.android.ui.theme.InterFontFamily, color = LightGrey)
+                }
+            }
+        )
     }
 
     if (uiState.showResetEverythingDialog) {
@@ -765,30 +913,34 @@ fun ProfileScreen(
                         )
 
                         if (isAutoDetectEnabled) {
-                            val badgeBg = if (isServiceConnected) Color(0xFFE8F5E9) else if (isNotificationAccessGranted) Color(0xFFFFF3E0) else Color(0xFFEEEEEE)
-                            val dotColor = if (isServiceConnected) Color(0xFF2E7D32) else if (isNotificationAccessGranted) Color(0xFFE65100) else Color(0xFF757575)
+                            val badgeBg = if (isServiceConnected) Zinc.copy(alpha = 0.12f) else if (isNotificationAccessGranted) Color(0xFFFFF3E0) else MaterialTheme.colorScheme.surfaceVariant
+                            val badgeContentColor = if (isServiceConnected) Zinc else if (isNotificationAccessGranted) Color(0xFFE65100) else LightGrey
                             val badgeText = if (isServiceConnected) "Active & Connected" else if (isNotificationAccessGranted) "Permission Granted" else "Access Required"
+                            val badgeIcon = if (isServiceConnected) Icons.Rounded.CheckCircle else if (isNotificationAccessGranted) Icons.Rounded.Warning else Icons.Rounded.Info
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(badgeBg)
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = badgeBg,
+                                contentColor = badgeContentColor
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(dotColor)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                ExpenseTextView(
-                                    text = badgeText,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = dotColor
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = badgeIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = badgeContentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    ExpenseTextView(
+                                        text = badgeText,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = badgeContentColor
+                                    )
+                                }
                             }
                         }
                     }
@@ -805,18 +957,34 @@ fun ProfileScreen(
                                 .weight(1f)
                                 .padding(end = 12.dp)
                         ) {
-                            ExpenseTextView(
-                                text = "Smart Payment Alerts",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ExpenseTextView(
+                                    text = "Smart Payment Alerts",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = { viewModel.onEvent(ProfileUiEvent.OnOpenDeviceSetupInfo) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = "Device Setup Tips",
+                                        tint = Zinc,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             ExpenseTextView(
                                 text = "Automatically log income & expenses from bank & payment SMS text alerts",
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 color = LightGrey,
-                                lineHeight = 18.sp
+                                lineHeight = 20.sp
                             )
                         }
 
@@ -838,33 +1006,9 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(14.dp))
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFFF0F0F0)
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // MIUI / Xiaomi / OEM Troubleshooting tip
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .clickable { viewModel.onEvent(ProfileUiEvent.OnOpenAppSettings) }
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ExpenseTextView(text = "⚡", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            ExpenseTextView(
-                                text = "Xiaomi / Redmi / POCO (MIUI & HyperOS): Enable 'Autostart' and set Battery Saver to 'No restrictions' in App Info for uninterrupted tracking.",
-                                fontSize = 11.5.sp,
-                                color = Zinc,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f),
-                                lineHeight = 16.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Test Auto-Detect Button
                         OutlinedButton(
@@ -878,7 +1022,7 @@ fun ProfileScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             ExpenseTextView(
                                 text = "Test Auto-Detect (Simulate Sample SMS)",
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Zinc
                             )
@@ -981,7 +1125,7 @@ fun ProfileScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         ExpenseTextView(
                             text = "DATA & PRIVACY",
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = LightGrey,
                             letterSpacing = 1.sp
@@ -989,7 +1133,7 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         ExpenseTextView(
                             text = "Reset all stored transactions, budgets, and configurations.",
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             color = LightGrey
                         )
                         Spacer(modifier = Modifier.height(14.dp))
@@ -1067,7 +1211,7 @@ fun ProfileScreen(
                 ) {
                     ExpenseTextView(
                         text = "from",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = LightGrey,
                         letterSpacing = 1.sp
@@ -1075,7 +1219,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(2.dp))
                     ExpenseTextView(
                         text = "winblader.org",
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Zinc,
                         letterSpacing = 0.5.sp
@@ -1083,7 +1227,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(3.dp))
                     ExpenseTextView(
                         text = "Vaulta v${com.waleed.vaulta.android.BuildConfig.VERSION_NAME} • Smart Expense Tracker",
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = LightGrey.copy(alpha = 0.8f)
                     )
@@ -1157,7 +1301,7 @@ fun EditProfileDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                ExpenseTextView(text = "FULL NAME", fontSize = 11.sp, color = LightGrey)
+                ExpenseTextView(text = "FULL NAME", fontSize = 13.sp, color = LightGrey)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = name,
@@ -1169,7 +1313,7 @@ fun EditProfileDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                ExpenseTextView(text = "MOBILE NUMBER", fontSize = 11.sp, color = LightGrey)
+                ExpenseTextView(text = "MOBILE NUMBER", fontSize = 13.sp, color = LightGrey)
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
                     value = phone,

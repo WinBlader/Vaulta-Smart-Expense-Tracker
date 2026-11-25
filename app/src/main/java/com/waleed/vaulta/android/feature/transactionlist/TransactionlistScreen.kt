@@ -236,18 +236,18 @@ fun TransactionListScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                ExpenseTextView(text = "Total Income", fontSize = 11.sp, color = LightGrey)
-                                ExpenseTextView(text = "+${Utils.formatCurrency(uiState.totalIncome)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Green)
+                                ExpenseTextView(text = "Total Income", fontSize = 13.sp, color = LightGrey)
+                                ExpenseTextView(text = "+${Utils.formatCurrency(uiState.totalIncome)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Green)
                             }
                             Column {
-                                ExpenseTextView(text = "Total Expense", fontSize = 11.sp, color = LightGrey)
-                                ExpenseTextView(text = "-${Utils.formatCurrency(uiState.totalExpense)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Red)
+                                ExpenseTextView(text = "Total Expense", fontSize = 13.sp, color = LightGrey)
+                                ExpenseTextView(text = "-${Utils.formatCurrency(uiState.totalExpense)}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Red)
                             }
                             Column {
-                                ExpenseTextView(text = "Net Balance", fontSize = 11.sp, color = LightGrey)
+                                ExpenseTextView(text = "Net Balance", fontSize = 13.sp, color = LightGrey)
                                 ExpenseTextView(
                                     text = Utils.formatCurrency(uiState.netBalance),
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (uiState.netBalance >= 0) Green else Red
                                 )
@@ -645,10 +645,10 @@ fun TransactionListScreen(
                         ) {
                             // Income Metric
                             Column {
-                                Text(text = "INCOME", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = LightGrey)
+                                Text(text = "INCOME", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = LightGrey)
                                 Text(
                                     text = "+${Utils.formatCurrency(uiState.totalIncome, currentCurrency)}",
-                                    fontSize = 14.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Green
                                 )
@@ -656,10 +656,10 @@ fun TransactionListScreen(
 
                             // Expense Metric
                             Column {
-                                Text(text = "EXPENSE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = LightGrey)
+                                Text(text = "EXPENSE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = LightGrey)
                                 Text(
                                     text = "-${Utils.formatCurrency(uiState.totalExpense, currentCurrency)}",
-                                    fontSize = 14.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Red
                                 )
@@ -667,10 +667,10 @@ fun TransactionListScreen(
 
                             // Net Metric
                             Column {
-                                Text(text = "NET", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = LightGrey)
+                                Text(text = "NET", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = LightGrey)
                                 Text(
                                     text = Utils.formatCurrency(uiState.netBalance, currentCurrency),
-                                    fontSize = 14.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (uiState.netBalance >= 0) MaterialTheme.colorScheme.primary else Red
                                 )
@@ -762,7 +762,7 @@ fun TransactionListScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Tap any transaction to view details & share receipt (PDF / PNG)",
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             color = LightGrey.copy(alpha = 0.8f),
                             modifier = Modifier.padding(bottom = 6.dp)
                         )

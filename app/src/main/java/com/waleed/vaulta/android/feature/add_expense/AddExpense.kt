@@ -251,7 +251,7 @@ fun DataForm(
                 Spacer(modifier = Modifier.width(4.dp))
                 ExpenseTextView(
                     text = if (isCustomName) "Choose Preset" else "✏️ Write Custom Title",
-                    fontSize = 11.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isCustomName) Zinc else Color.DarkGray
                 )
@@ -288,7 +288,7 @@ fun DataForm(
             Spacer(modifier = Modifier.height(4.dp))
             ExpenseTextView(
                 text = "← Switch back to predefined categories",
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                 modifier = Modifier
