@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.4%20(Build%2010)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.4"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.5%20(Build%2011)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.5"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -272,6 +272,7 @@ Vaulta/
 ## 🔒 Privacy Policy & Data Security
 
 Vaulta is committed to complete user privacy:
+- **Mandatory Privacy Policy Acceptance Gate:** A dedicated, full-screen Privacy Policy gate renders immediately upon new user registration, first-time Guest Mode entry, and for upgraded existing accounts before granting access to the dashboard. Acceptance (`privacy_policy_accepted_v1`) is persisted locally and securely synchronized to the user's Supabase cloud profile.
 - **Offline-First by Design:** All financial transactions remain stored locally on your device by default.
 - **Zero Data Monetization:** Vaulta never sells, rents, or shares personal or financial data with third-party advertisers.
 - **Strict Multi-User Isolation:** Each account's data is strictly partitioned by user ID in the local database. Transactions, balances, and statistics are safely preserved across sessions and synchronized with Supabase cloud on sign-in.

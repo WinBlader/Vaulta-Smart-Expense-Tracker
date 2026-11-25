@@ -681,6 +681,21 @@ class SupabaseAuthService @Inject constructor(
         }
     }
 
+    suspend fun updatePrivacyPolicyAcceptedCloud(): Unit = withContext(Dispatchers.IO) {
+        if (!SupabaseClientProvider.isConfigured()) return@withContext
+        try {
+            val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
+            client.auth.updateUser {
+                data {
+                    put("privacy_policy_accepted_v1", true)
+                    put("privacy_policy_accepted_at", nowStr)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice updating privacy policy in Supabase: ${e.message}")
+        }
+    }
+
     private fun saveToSession(user: SupabaseUser) {
         sessionManager.saveUser(
             UserProfile(
@@ -691,6 +706,17 @@ class SupabaseAuthService @Inject constructor(
                 authProvider = if (user.provider.startsWith("Supabase")) user.provider else "Supabase (${user.provider})"
             )
         )
+        try {
+            val currentUser = client.auth.currentUserOrNull()
+            val metaAccepted = currentUser?.userMetadata?.get("privacy_policy_accepted_v1")?.toString()?.trim('"')?.toBooleanStrictOrNull()
+                ?: currentUser?.userMetadata?.get("privacy_policy_accepted")?.toString()?.trim('"')?.toBooleanStrictOrNull()
+                ?: false
+            if (metaAccepted && user.id.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, user.id)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not check privacy policy metadata: ${e.message}")
+        }
     }
 
     private fun fallbackLocalRegistration(

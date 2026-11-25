@@ -71,6 +71,8 @@ interface AuthRepository {
     fun setThemeMode(mode: String)
     fun logout()
     fun getAllRegisteredAccounts(): List<UserProfile>
+    fun isPrivacyPolicyAccepted(userKey: String? = null): Boolean
+    suspend fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String? = null)
 }
 
 @Singleton
@@ -298,5 +300,23 @@ class AuthRepositoryImpl @Inject constructor(
 
     override fun getAllRegisteredAccounts(): List<UserProfile> {
         return sessionManager.getAllRegisteredAccounts()
+    }
+
+    override fun isPrivacyPolicyAccepted(userKey: String?): Boolean {
+        return sessionManager.isPrivacyPolicyAccepted(userKey)
+    }
+
+    override suspend fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String?) {
+        val key = userKey ?: sessionManager.getCurrentUserKey()
+        sessionManager.setPrivacyPolicyAccepted(accepted, key)
+        if (accepted) {
+            withContext(Dispatchers.IO) {
+                try {
+                    supabaseAuthService.updatePrivacyPolicyAcceptedCloud()
+                } catch (e: Exception) {
+                    android.util.Log.w("AuthRepository", "Notice updating privacy policy in Supabase: ${e.message}")
+                }
+            }
+        }
     }
 }

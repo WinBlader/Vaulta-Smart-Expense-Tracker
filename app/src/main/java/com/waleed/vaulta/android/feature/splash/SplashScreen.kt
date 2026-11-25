@@ -47,7 +47,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SplashScreen(
     navController: NavController,
-    isLoggedIn: Boolean
+    isLoggedIn: Boolean,
+    isPrivacyPolicyAccepted: Boolean = false
 ) {
     val scale = remember { Animatable(0.7f) }
     val alpha = remember { Animatable(0f) }
@@ -95,8 +96,12 @@ fun SplashScreen(
         // Wait total ~2 seconds for a premium, non-rushed splash experience
         delay(1800)
 
-        // Navigate to Home if logged in, or Login if not
-        val destination = if (isLoggedIn) NavRouts.home else NavRouts.login
+        // Navigate based on auth status and privacy policy acceptance gate
+        val destination = when {
+            !isLoggedIn -> NavRouts.login
+            !isPrivacyPolicyAccepted -> NavRouts.privacy_policy_consent
+            else -> NavRouts.home
+        }
         navController.navigate(destination) {
             popUpTo(NavRouts.splash) {
                 inclusive = true

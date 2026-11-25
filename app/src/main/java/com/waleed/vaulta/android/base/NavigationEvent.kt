@@ -20,6 +20,7 @@ sealed class AuthNavigationEvent : NavigationEvent() {
     object NavigateToHome : AuthNavigationEvent()
     object NavigateToRegister : AuthNavigationEvent()
     object NavigateToLogin : AuthNavigationEvent()
+    object NavigateToPrivacyConsent : AuthNavigationEvent()
 }
 
 sealed class ProfileNavigationEvent : NavigationEvent() {

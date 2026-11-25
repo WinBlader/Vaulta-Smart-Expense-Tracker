@@ -97,6 +97,16 @@ fun RegisterScreen(
                         navController.navigate("/home")
                     }
                 }
+                AuthNavigationEvent.NavigateToPrivacyConsent -> {
+                    try {
+                        navController.navigate("/privacy_policy_consent") {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } catch (_: Exception) {
+                        navController.navigate("/privacy_policy_consent")
+                    }
+                }
                 AuthNavigationEvent.NavigateToLogin -> {
                     navController.popBackStack()
                 }

@@ -90,7 +90,7 @@ class LoginViewModel @Inject constructor(
                     )
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     result.onSuccess {
-                        _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                        emitNavigation(it.id)
                     }.onFailure { err ->
                         _uiState.value = _uiState.value.copy(errorMessage = err.message ?: "Google Sign-in failed")
                     }
@@ -106,9 +106,17 @@ class LoginViewModel @Inject constructor(
             is LoginUiEvent.OnGuestClicked -> {
                 authRepository.loginAsGuest()
                 viewModelScope.launch {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation("guest")
                 }
             }
+        }
+    }
+
+    private suspend fun emitNavigation(userKey: String? = null) {
+        if (!authRepository.isPrivacyPolicyAccepted(userKey)) {
+            _navigationEvent.emit(AuthNavigationEvent.NavigateToPrivacyConsent)
+        } else {
+            _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
         }
     }
 
@@ -133,7 +141,7 @@ class LoginViewModel @Inject constructor(
                 val result = authRepository.loginWithPhone(state.countryCode, state.mobileNumber, password)
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 result.onSuccess {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation(it.id)
                 }.onFailure { err ->
                     _uiState.value = _uiState.value.copy(
                         errorMessage = err.message ?: "Login failed. Check your credentials."
@@ -152,7 +160,7 @@ class LoginViewModel @Inject constructor(
                 val result = authRepository.loginWithEmail(email, password)
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 result.onSuccess {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation(it.id)
                 }.onFailure { err ->
                     _uiState.value = _uiState.value.copy(
                         errorMessage = err.message ?: "Login failed. Check your credentials."

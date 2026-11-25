@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.waleed.vaulta.android.feature.add_expense.AddExpense
 import com.waleed.vaulta.android.feature.auth.LoginScreen
+import com.waleed.vaulta.android.feature.auth.PrivacyPolicyConsentScreen
 import com.waleed.vaulta.android.feature.auth.RegisterScreen
 import com.waleed.vaulta.android.feature.budget.SpendsDashboardScreen
 import com.waleed.vaulta.android.feature.home.HomeScreen
@@ -41,7 +42,8 @@ import com.waleed.vaulta.android.widget.VaultaSnackbarHost
 
 @Composable
 fun NavHostScreen(
-    isLoggedIn: Boolean = false
+    isLoggedIn: Boolean = false,
+    isPrivacyPolicyAccepted: Boolean = false
 ) {
     val navController = rememberNavController()
     var bottomBarVisibility by remember {
@@ -71,8 +73,14 @@ fun NavHostScreen(
                     bottomBarVisibility = false
                     SplashScreen(
                         navController = navController,
-                        isLoggedIn = isLoggedIn
+                        isLoggedIn = isLoggedIn,
+                        isPrivacyPolicyAccepted = isPrivacyPolicyAccepted
                     )
+                }
+
+                composable(route = NavRouts.privacy_policy_consent) {
+                    bottomBarVisibility = false
+                    PrivacyPolicyConsentScreen(navController = navController)
                 }
 
                 composable(route = "/login") {

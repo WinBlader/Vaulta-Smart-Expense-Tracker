@@ -30,6 +30,8 @@ class UserSessionManager @Inject constructor(
         private const val KEY_REGISTERED_AT = "registered_at"
         private const val KEY_REGISTERED_ACCOUNTS = "registered_accounts_json"
         private const val KEY_THEME_MODE = "app_theme_mode"
+        private const val KEY_PRIVACY_POLICY_ACCEPTED = "privacy_policy_accepted_v1"
+        private const val KEY_PRIVACY_POLICY_ACCEPTED_AT = "privacy_policy_accepted_v1_timestamp"
     }
 
     private val _themeMode = MutableStateFlow(prefs.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM")
@@ -45,6 +47,61 @@ class UserSessionManager @Inject constructor(
 
     fun isLoggedIn(): Boolean {
         return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    /**
+     * Checks if the Privacy Policy (v1) has been accepted for the active or specified user key.
+     * Supports per-user isolation, guest mode flags, and cross-session persistence.
+     */
+    fun isPrivacyPolicyAccepted(userKey: String? = null): Boolean {
+        val key = userKey?.ifBlank { null } ?: getCurrentUserKey()
+
+        // 1. Check primary isolated key (userId / normalized email / guest)
+        if (prefs.getBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_$key", false)) {
+            return true
+        }
+
+        // 2. Check by current user's email if key was UUID
+        val currentEmail = _currentUser.value?.email?.trim()?.lowercase()
+        if (!currentEmail.isNullOrBlank() && prefs.getBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_$currentEmail", false)) {
+            return true
+        }
+
+        // 3. For guest mode, check guest-specific or general fallback flag
+        if (key == "guest") {
+            return prefs.getBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_guest", false) ||
+                    prefs.getBoolean(KEY_PRIVACY_POLICY_ACCEPTED, false)
+        }
+
+        return false
+    }
+
+    /**
+     * Persists Privacy Policy acceptance locally for the active or specified user key.
+     */
+    fun setPrivacyPolicyAccepted(
+        accepted: Boolean,
+        userKey: String? = null,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
+        val key = userKey?.ifBlank { null } ?: getCurrentUserKey()
+        val editor = prefs.edit()
+            .putBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_$key", accepted)
+            .putLong("${KEY_PRIVACY_POLICY_ACCEPTED_AT}_$key", timestamp)
+
+        if (key == "guest") {
+            editor.putBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_guest", accepted)
+            editor.putLong("${KEY_PRIVACY_POLICY_ACCEPTED_AT}_guest", timestamp)
+            editor.putBoolean(KEY_PRIVACY_POLICY_ACCEPTED, accepted)
+        }
+
+        val currentEmail = _currentUser.value?.email?.trim()?.lowercase()
+        if (!currentEmail.isNullOrBlank()) {
+            editor.putBoolean("${KEY_PRIVACY_POLICY_ACCEPTED}_$currentEmail", accepted)
+            editor.putLong("${KEY_PRIVACY_POLICY_ACCEPTED_AT}_$currentEmail", timestamp)
+        }
+
+        editor.apply()
     }
 
     /**

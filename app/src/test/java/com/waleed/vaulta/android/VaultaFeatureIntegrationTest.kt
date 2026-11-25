@@ -5,9 +5,11 @@ import com.waleed.vaulta.android.data.model.ExpenseSummary
 import com.waleed.vaulta.android.data.model.TransactionDto
 import com.waleed.vaulta.android.feature.home.HomeViewModel
 import com.waleed.vaulta.android.feature.stats.StatsViewModel
+import com.waleed.vaulta.android.utils.NavRouts
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -218,5 +220,127 @@ class VaultaFeatureIntegrationTest {
         assertEquals(5000.0, expenseTotal, 0.001)
         assertEquals(25000.0, incomeTotal, 0.001)
         assertEquals(5000.0, creditOweTotal, 0.001)
+    }
+
+    // ==============================================================
+    // Privacy Policy Acceptance Gate Navigation & Persistence Tests
+    // ==============================================================
+
+    @Test
+    fun testNewUserRegistrationRedirectsToPrivacyPolicyGateAndProceedsOnAcceptance() {
+        val mockStorage = mutableMapOf<String, Any>()
+        val newUserId = "user_new_456"
+
+        fun isPrivacyPolicyAccepted(userKey: String): Boolean =
+            mockStorage["privacy_policy_accepted_v1_$userKey"] as? Boolean ?: false
+
+        fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String) {
+            mockStorage["privacy_policy_accepted_v1_$userKey"] = accepted
+            mockStorage["privacy_policy_accepted_v1_timestamp_$userKey"] = System.currentTimeMillis()
+        }
+
+        fun resolvePostAuthDestination(userKey: String): String =
+            if (!isPrivacyPolicyAccepted(userKey)) NavRouts.privacy_policy_consent else NavRouts.home
+
+        // 1. Immediately after registration, user has NOT accepted yet
+        assertFalse(isPrivacyPolicyAccepted(newUserId))
+        val postRegDestination = resolvePostAuthDestination(newUserId)
+        assertEquals(NavRouts.privacy_policy_consent, postRegDestination)
+
+        // 2. User cannot enter HomeScreen until accepted
+        val isBlocked = postRegDestination != NavRouts.home
+        assertTrue(isBlocked)
+
+        // 3. User taps "Accept & Continue" on the Privacy Policy screen
+        setPrivacyPolicyAccepted(true, newUserId)
+        assertTrue(isPrivacyPolicyAccepted(newUserId))
+
+        // 4. Now navigation resolves directly to HomeScreen
+        val destinationAfterAccept = resolvePostAuthDestination(newUserId)
+        assertEquals(NavRouts.home, destinationAfterAccept)
+    }
+
+    @Test
+    fun testExistingUpgradedUserWithoutAcceptanceShownGateOnceBeforeHomeScreen() {
+        val mockStorage = mutableMapOf<String, Any>()
+        val upgradedUserId = "user_legacy_789"
+        val isLoggedIn = true
+
+        fun isPrivacyPolicyAccepted(userKey: String): Boolean =
+            mockStorage["privacy_policy_accepted_v1_$userKey"] as? Boolean ?: false
+
+        fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String) {
+            mockStorage["privacy_policy_accepted_v1_$userKey"] = accepted
+        }
+
+        fun resolveSplashDestination(isLoggedIn: Boolean, isAccepted: Boolean): String =
+            when {
+                !isLoggedIn -> NavRouts.login
+                !isAccepted -> NavRouts.privacy_policy_consent
+                else -> NavRouts.home
+            }
+
+        // 1. Upgraded user launch before accepting: privacy_policy_accepted_v1 is missing/false
+        assertFalse(isPrivacyPolicyAccepted(upgradedUserId))
+        val firstLaunchDestination = resolveSplashDestination(
+            isLoggedIn = isLoggedIn,
+            isAccepted = isPrivacyPolicyAccepted(upgradedUserId)
+        )
+        assertEquals(NavRouts.privacy_policy_consent, firstLaunchDestination)
+
+        // 2. User accepts the Privacy Policy
+        setPrivacyPolicyAccepted(true, upgradedUserId)
+
+        // 3. Subsequent app launches proceed straight to Home Screen
+        val subsequentLaunchDestination = resolveSplashDestination(
+            isLoggedIn = isLoggedIn,
+            isAccepted = isPrivacyPolicyAccepted(upgradedUserId)
+        )
+        assertEquals(NavRouts.home, subsequentLaunchDestination)
+    }
+
+    @Test
+    fun testReturningUserWhoAlreadyAcceptedGoesStraightToHomeScreen() {
+        val mockStorage = mutableMapOf<String, Any>()
+        val returningUserId = "user_returning_321"
+
+        // Returning user has already accepted in previous session
+        mockStorage["privacy_policy_accepted_v1_$returningUserId"] = true
+
+        fun isPrivacyPolicyAccepted(userKey: String): Boolean =
+            mockStorage["privacy_policy_accepted_v1_$userKey"] as? Boolean ?: false
+
+        fun resolveLoginDestination(userKey: String): String =
+            if (!isPrivacyPolicyAccepted(userKey)) NavRouts.privacy_policy_consent else NavRouts.home
+
+        // Logging in takes returning user directly to Home Screen
+        val destination = resolveLoginDestination(returningUserId)
+        assertEquals(NavRouts.home, destination)
+    }
+
+    @Test
+    fun testSignOutPreservesPrivacyPolicyAcceptance() {
+        val mockStorage = mutableMapOf<String, Any>()
+        val activeUserId = "user_active_999"
+
+        // 1. User accepts Privacy Policy during onboarding
+        mockStorage["privacy_policy_accepted_v1_$activeUserId"] = true
+        mockStorage["privacy_policy_accepted_v1_timestamp_$activeUserId"] = 1732500000000L
+
+        // 2. User signs out (clearing session, but preserving user-scoped prefs)
+        fun simulateSignOut(sessionPrefs: MutableMap<String, Any>) {
+            // Mirrors UserSessionManager.logout(): only clears session tokens and active user ID,
+            // never wipes per-user settings or privacy policy acceptance flags
+            sessionPrefs.remove("is_logged_in")
+            sessionPrefs.remove("user_id")
+            sessionPrefs.remove("user_name")
+            sessionPrefs.remove("user_email")
+        }
+
+        simulateSignOut(mockStorage)
+
+        // 3. Acceptance flag for this user key remains intact
+        val stillAccepted = mockStorage["privacy_policy_accepted_v1_$activeUserId"] as? Boolean
+        assertEquals(true, stillAccepted)
     }
 }

@@ -107,6 +107,11 @@ fun LoginScreen(
                         popUpTo("/login") { inclusive = true }
                     }
                 }
+                is AuthUiEffect.NavigateToPrivacyConsent -> {
+                    navController.navigate("/privacy_policy_consent") {
+                        popUpTo("/login") { inclusive = true }
+                    }
+                }
                 is AuthUiEffect.NavigateToRegister -> {
                     navController.navigate("/signup")
                 }

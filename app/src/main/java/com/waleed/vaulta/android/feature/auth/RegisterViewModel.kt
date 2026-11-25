@@ -102,7 +102,7 @@ class RegisterViewModel @Inject constructor(
                     )
                     _uiState.value = _uiState.value.copy(isLoading = false)
                     result.onSuccess {
-                        _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                        emitNavigation(it.id)
                     }.onFailure { err ->
                         _uiState.value = _uiState.value.copy(errorMessage = err.message ?: "Google Sign-in failed")
                     }
@@ -118,9 +118,17 @@ class RegisterViewModel @Inject constructor(
             is RegisterUiEvent.OnGuestClicked -> {
                 authRepository.loginAsGuest()
                 viewModelScope.launch {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation("guest")
                 }
             }
+        }
+    }
+
+    private suspend fun emitNavigation(userKey: String? = null) {
+        if (!authRepository.isPrivacyPolicyAccepted(userKey)) {
+            _navigationEvent.emit(AuthNavigationEvent.NavigateToPrivacyConsent)
+        } else {
+            _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
         }
     }
 
@@ -162,7 +170,7 @@ class RegisterViewModel @Inject constructor(
                 )
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 result.onSuccess {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation(it.id)
                 }.onFailure { err ->
                     _uiState.value = _uiState.value.copy(
                         errorMessage = err.message ?: "Registration failed with Supabase"
@@ -186,7 +194,7 @@ class RegisterViewModel @Inject constructor(
                 )
                 _uiState.value = _uiState.value.copy(isLoading = false)
                 result.onSuccess {
-                    _navigationEvent.emit(AuthNavigationEvent.NavigateToHome)
+                    emitNavigation(it.id)
                 }.onFailure { err ->
                     _uiState.value = _uiState.value.copy(
                         errorMessage = err.message ?: "Phone registration failed with Supabase"

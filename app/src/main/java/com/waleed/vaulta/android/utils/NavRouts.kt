@@ -5,6 +5,7 @@ object NavRouts {
     const val login = "/login"
     const val signup = "/signup"
     const val forgotpassword = "/forgot_password"
+    const val privacy_policy_consent = "/privacy_policy_consent"
     const val home = "/home"
     const val addscreen = "/add_exp"
     const val add_income = "/add_income"

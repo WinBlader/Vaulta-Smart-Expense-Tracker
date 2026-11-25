@@ -26,6 +26,7 @@ import javax.inject.Inject
 
 sealed class AuthUiEffect {
     data object NavigateToHome : AuthUiEffect()
+    data object NavigateToPrivacyConsent : AuthUiEffect()
     data object NavigateToLogin : AuthUiEffect()
     data object NavigateToRegister : AuthUiEffect()
     data class ShowToast(val message: String) : AuthUiEffect()
@@ -83,9 +84,9 @@ class AuthViewModel @Inject constructor(
             )
 
             _isLoading.value = false
-            result.onSuccess {
+            result.onSuccess { user ->
                 _successMessage.value = "Account created successfully! Welcome to Vaulta."
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { error ->
                 _errorMessage.value = error.message ?: "Sign-up failed. Please try again."
             }
@@ -109,9 +110,9 @@ class AuthViewModel @Inject constructor(
             val result = authRepository.loginWithEmail(email, password)
             _isLoading.value = false
 
-            result.onSuccess {
+            result.onSuccess { user ->
                 _successMessage.value = "Logged in successfully!"
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { error ->
                 _errorMessage.value = error.message ?: "Login failed. Please check your credentials."
             }
@@ -140,9 +141,9 @@ class AuthViewModel @Inject constructor(
             val result = authRepository.loginWithPhone(countryCode, mobileNumber, password)
             _isLoading.value = false
 
-            result.onSuccess {
+            result.onSuccess { user ->
                 _successMessage.value = "Logged in successfully!"
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { error ->
                 _errorMessage.value = error.message ?: "Login failed. Please check your credentials."
             }
@@ -182,9 +183,9 @@ class AuthViewModel @Inject constructor(
             _errorMessage.value = null
             val result = authRepository.verifyEmailOtp(email, token)
             _isLoading.value = false
-            result.onSuccess {
+            result.onSuccess { user ->
                 _successMessage.value = "Email verified successfully!"
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { err ->
                 _errorMessage.value = err.message ?: "Verification failed."
             }
@@ -224,9 +225,9 @@ class AuthViewModel @Inject constructor(
             _errorMessage.value = null
             val result = authRepository.verifyPhoneOtp(phone, token)
             _isLoading.value = false
-            result.onSuccess {
+            result.onSuccess { user ->
                 _successMessage.value = "Mobile number verified!"
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { err ->
                 _errorMessage.value = err.message ?: "Invalid OTP."
             }
@@ -249,7 +250,7 @@ class AuthViewModel @Inject constructor(
             _isLoading.value = false
             result.onSuccess { user ->
                 _successMessage.value = "Signed in as ${user.username} with Google!"
-                _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                emitPostAuthNavigation(user.id)
             }.onFailure { err ->
                 _errorMessage.value = err.message ?: "Google authentication failed."
             }
@@ -262,7 +263,24 @@ class AuthViewModel @Inject constructor(
         authRepository.loginAsGuest()
         viewModelScope.launch {
             _successMessage.value = "Welcome! Exploring Vaulta as Guest"
+            emitPostAuthNavigation("guest")
+        }
+    }
+
+    private suspend fun emitPostAuthNavigation(userKey: String? = null) {
+        if (!authRepository.isPrivacyPolicyAccepted(userKey)) {
+            _uiEffect.emit(AuthUiEffect.NavigateToPrivacyConsent)
+        } else {
             _uiEffect.emit(AuthUiEffect.NavigateToHome)
+        }
+    }
+
+    fun isPrivacyPolicyAccepted(userKey: String? = null): Boolean =
+        authRepository.isPrivacyPolicyAccepted(userKey)
+
+    fun setPrivacyPolicyAccepted(accepted: Boolean, userKey: String? = null) {
+        viewModelScope.launch {
+            authRepository.setPrivacyPolicyAccepted(accepted, userKey)
         }
     }
 
@@ -306,7 +324,7 @@ class AuthViewModel @Inject constructor(
                     _isLoading.value = false
                     authResult.onSuccess {
                         _successMessage.value = "Welcome, ${it.username}!"
-                        _uiEffect.emit(AuthUiEffect.NavigateToHome)
+                        emitPostAuthNavigation(it.id)
                     }.onFailure { err ->
                         _errorMessage.value = err.message ?: "Google authentication failed."
                     }

@@ -68,7 +68,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NavHostScreen(authRepository.isLoggedIn())
+                    NavHostScreen(
+                        isLoggedIn = authRepository.isLoggedIn(),
+                        isPrivacyPolicyAccepted = authRepository.isPrivacyPolicyAccepted()
+                    )
                 }
             }
         }
