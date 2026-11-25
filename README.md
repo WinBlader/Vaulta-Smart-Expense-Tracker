@@ -219,7 +219,7 @@ Vaulta/
 │   │   │   │   └── Vaulta.kt                # Application class (@HiltAndroidApp)
 │   │   │   └── res/                         # Vector drawables, mipmaps, string resources
 │   │   └── test/                            # Unit and instrumentation tests
-│   ├── build.gradle.kts                     # App module build configuration (v1.4.2)
+│   ├── build.gradle.kts                     # App module build configuration (v1.4.7)
 │   └── proguard-rules.pro                   # ProGuard / R8 rules
 ├── screenshots/                             # High-resolution application screenshots
 ├── PRIVACY_POLICY.md                        # Official Privacy Policy

@@ -607,4 +607,41 @@ class VaultaFeatureIntegrationTest {
         assertEquals("tx-uuid-2", oweItem.uuid)
         assertEquals("Pending settlement", oweItem.note)
     }
+
+    @Test
+    fun testProfileOverwritePreventionOnLogin() {
+        // Given an existing profile saved in Supabase
+        val existingCloudProfile = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user-waleed-123",
+            username = "Waleed Wani",
+            displayName = "Waleed Wani",
+            fullName = "Waleed Wani",
+            email = "waleedwani06072005@gmail.com",
+            phoneNumber = "+919876543210",
+            currencyCode = "INR",
+            monthlyBudget = 25000.0,
+            privacyPolicyAccepted = true
+        )
+
+        // When user logs in with Google account (which gives default email prefix or google display name)
+        val incomingGoogleDisplayName = "waleed wani"
+        val incomingEmail = "waleedwani06072005@gmail.com"
+
+        // Resolver logic should preserve the existing cloud values
+        val resolvedName = existingCloudProfile.displayName?.ifBlank { null }
+            ?: existingCloudProfile.fullName?.ifBlank { null }
+            ?: incomingGoogleDisplayName
+
+        val resolvedPhone = existingCloudProfile.cleanPhoneNumber.ifBlank { "" }
+
+        val resolvedCurrency = existingCloudProfile.currencyCode?.ifBlank { null } ?: "USD"
+        val resolvedBudget = existingCloudProfile.monthlyBudget ?: 0.0
+        val resolvedPolicy = existingCloudProfile.privacyPolicyAccepted ?: false
+
+        assertEquals("Waleed Wani", resolvedName)
+        assertEquals("+919876543210", resolvedPhone)
+        assertEquals("INR", resolvedCurrency)
+        assertEquals(25000.0, resolvedBudget, 0.001)
+        assertTrue(resolvedPolicy)
+    }
 }

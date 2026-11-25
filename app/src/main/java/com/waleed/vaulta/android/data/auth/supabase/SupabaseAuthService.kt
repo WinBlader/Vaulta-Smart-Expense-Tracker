@@ -87,21 +87,59 @@ class SupabaseAuthService @Inject constructor(
             val currentUser = client.auth.currentUserOrNull()
             val userId = currentUser?.id ?: UUID.randomUUID().toString()
 
+            val existingProfile: ProfileDto? = try {
+                if (userId.isNotBlank()) {
+                    client.from("profiles")
+                        .select {
+                            filter {
+                                eq("id", userId)
+                            }
+                        }
+                        .decodeSingleOrNull<ProfileDto>()
+                } else null
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice querying profiles in registerWithEmail: ${e.message}")
+                null
+            }
+
+            val finalUsername = existingProfile?.displayName?.ifBlank { null }
+                ?: existingProfile?.fullName?.ifBlank { null }
+                ?: existingProfile?.username?.ifBlank { null }
+                ?: cleanUsername
+
+            val finalPhone = existingProfile?.cleanPhoneNumber?.ifBlank { null }
+                ?: cleanPhone.takeIf { !it.equals("EMPTY", ignoreCase = true) }?.ifBlank { null }
+                ?: ""
+
             // Persist profile to public.profiles table in Supabase Postgres
             val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
-            val profile = ProfileDto(
-                id = userId,
-                username = cleanUsername,
-                displayName = cleanUsername,
-                fullName = cleanUsername,
-                email = cleanEmail,
-                phoneNumber = cleanPhone,
-                authProvider = "Email",
-                currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
-                monthlyBudget = 0.0,
-                privacyPolicyAccepted = false,
-                updatedAt = nowStr
-            )
+            val profile = if (existingProfile != null) {
+                existingProfile.copy(
+                    username = existingProfile.username?.ifBlank { null } ?: finalUsername,
+                    displayName = existingProfile.displayName?.ifBlank { null } ?: finalUsername,
+                    fullName = existingProfile.fullName?.ifBlank { null } ?: finalUsername,
+                    email = existingProfile.email?.ifBlank { null } ?: cleanEmail,
+                    phoneNumber = if (existingProfile.phoneNumber.isNullOrBlank() || existingProfile.phoneNumber.equals("EMPTY", ignoreCase = true)) {
+                        finalPhone.ifBlank { null }
+                    } else existingProfile.phoneNumber,
+                    authProvider = existingProfile.authProvider ?: "Email",
+                    updatedAt = nowStr
+                )
+            } else {
+                ProfileDto(
+                    id = userId,
+                    username = finalUsername,
+                    displayName = finalUsername,
+                    fullName = finalUsername,
+                    email = cleanEmail,
+                    phoneNumber = finalPhone.ifBlank { null },
+                    authProvider = "Email",
+                    currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
+                    monthlyBudget = 0.0,
+                    privacyPolicyAccepted = false,
+                    updatedAt = nowStr
+                )
+            }
 
             try {
                 client.from("profiles").upsert(profile)
@@ -109,11 +147,18 @@ class SupabaseAuthService @Inject constructor(
                 Log.w(TAG, "Notice: could not upsert to public.profiles table (may be handled by trigger): ${e.message}")
             }
 
+            existingProfile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (existingProfile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
+
             val user = SupabaseUser(
                 id = userId,
-                username = cleanUsername,
+                username = finalUsername,
                 email = cleanEmail,
-                phone = cleanPhone,
+                phone = finalPhone,
                 provider = "Email",
                 accessToken = client.auth.currentAccessTokenOrNull() ?: ""
             )
@@ -179,11 +224,18 @@ class SupabaseAuthService @Inject constructor(
                 ?: currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
                 ?: cleanEmail.substringBefore("@")
 
-            val phone = profile?.phoneNumber?.ifBlank { null }
-                ?: savedProfile?.phoneNumber?.ifBlank { null }
-                ?: currentUser?.userMetadata?.get("phone_number")?.toString()?.trim('"')
-                ?: currentUser?.phone
+            val phone = profile?.cleanPhoneNumber?.ifBlank { null }
+                ?: savedProfile?.phoneNumber?.takeIf { !it.equals("EMPTY", ignoreCase = true) }?.ifBlank { null }
+                ?: currentUser?.userMetadata?.get("phone_number")?.toString()?.trim('"')?.takeIf { !it.equals("EMPTY", ignoreCase = true) }
+                ?: currentUser?.phone?.takeIf { !it.equals("EMPTY", ignoreCase = true) }
                 ?: ""
+
+            profile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (profile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
 
             val user = SupabaseUser(
                 id = userId,
@@ -242,11 +294,32 @@ class SupabaseAuthService @Inject constructor(
                 token = token.trim()
             )
             val currentUser = client.auth.currentUserOrNull()
+            val userId = currentUser?.id ?: ""
+            val existingProfile: ProfileDto? = try {
+                if (userId.isNotBlank()) {
+                    client.from("profiles").select { filter { eq("id", userId) } }.decodeSingleOrNull<ProfileDto>()
+                } else null
+            } catch (_: Exception) { null }
+
+            val resolvedUsername = existingProfile?.displayName?.ifBlank { null }
+                ?: existingProfile?.fullName?.ifBlank { null }
+                ?: existingProfile?.username?.ifBlank { null }
+                ?: cleanEmail.substringBefore("@")
+
+            val resolvedPhone = existingProfile?.cleanPhoneNumber ?: ""
+
+            existingProfile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (existingProfile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
+
             val user = SupabaseUser(
-                id = currentUser?.id ?: "",
-                username = cleanEmail.substringBefore("@"),
+                id = userId,
+                username = resolvedUsername,
                 email = cleanEmail,
-                phone = "",
+                phone = resolvedPhone,
                 provider = "Email OTP",
                 accessToken = client.auth.currentAccessTokenOrNull() ?: ""
             )
@@ -296,10 +369,29 @@ class SupabaseAuthService @Inject constructor(
                 token = token.trim()
             )
             val currentUser = client.auth.currentUserOrNull()
+            val userId = currentUser?.id ?: ""
+            val existingProfile: ProfileDto? = try {
+                if (userId.isNotBlank()) {
+                    client.from("profiles").select { filter { eq("id", userId) } }.decodeSingleOrNull<ProfileDto>()
+                } else null
+            } catch (_: Exception) { null }
+
+            val resolvedUsername = existingProfile?.displayName?.ifBlank { null }
+                ?: existingProfile?.fullName?.ifBlank { null }
+                ?: existingProfile?.username?.ifBlank { null }
+                ?: "User_${cleanPhone.takeLast(4)}"
+
+            existingProfile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (existingProfile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
+
             val user = SupabaseUser(
-                id = currentUser?.id ?: "",
-                username = "User_${cleanPhone.takeLast(4)}",
-                email = "",
+                id = userId,
+                username = resolvedUsername,
+                email = existingProfile?.email ?: "",
                 phone = cleanPhone,
                 provider = "Phone OTP",
                 accessToken = client.auth.currentAccessTokenOrNull() ?: ""
@@ -341,36 +433,83 @@ class SupabaseAuthService @Inject constructor(
             val userId = currentUser?.id ?: UUID.randomUUID().toString()
             val savedProfile = sessionManager.getSavedProfile(email = email, id = userId)
             val resolvedEmail = email.ifBlank { currentUser?.email ?: "" }
-            val resolvedName = displayName.ifBlank {
-                savedProfile?.name?.ifBlank { null }
-                    ?: currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
-                    ?: resolvedEmail.substringBefore("@")
+
+            // Check if profile exists in Supabase public.profiles
+            val existingProfile: ProfileDto? = try {
+                if (userId.isNotBlank()) {
+                    client.from("profiles")
+                        .select {
+                            filter {
+                                eq("id", userId)
+                            }
+                        }
+                        .decodeSingleOrNull<ProfileDto>()
+                } else null
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice querying profiles table in loginWithGoogleIdToken: ${e.message}")
+                null
             }
 
-            // Sync to public profiles
+            val finalDisplayName = existingProfile?.displayName?.ifBlank { null }
+                ?: existingProfile?.fullName?.ifBlank { null }
+                ?: existingProfile?.username?.ifBlank { null }
+                ?: displayName.ifBlank { null }
+                ?: savedProfile?.name?.ifBlank { null }
+                ?: currentUser?.userMetadata?.get("full_name")?.toString()?.trim('"')
+                ?: resolvedEmail.substringBefore("@")
+
+            val finalPhone = existingProfile?.cleanPhoneNumber?.ifBlank { null }
+                ?: savedProfile?.phoneNumber?.takeIf { !it.equals("EMPTY", ignoreCase = true) }?.ifBlank { null }
+                ?: currentUser?.userMetadata?.get("phone_number")?.toString()?.trim('"')?.takeIf { !it.equals("EMPTY", ignoreCase = true) }
+                ?: ""
+
             val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
-            val profile = ProfileDto(
-                id = userId,
-                username = resolvedName,
-                displayName = resolvedName,
-                fullName = resolvedName,
-                email = resolvedEmail,
-                phoneNumber = "",
-                authProvider = "Google",
-                currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
-                monthlyBudget = 0.0,
-                privacyPolicyAccepted = false,
-                updatedAt = nowStr
-            )
+            val profileToUpsert = if (existingProfile != null) {
+                existingProfile.copy(
+                    username = existingProfile.username?.ifBlank { null } ?: finalDisplayName,
+                    displayName = existingProfile.displayName?.ifBlank { null } ?: finalDisplayName,
+                    fullName = existingProfile.fullName?.ifBlank { null } ?: finalDisplayName,
+                    email = existingProfile.email?.ifBlank { null } ?: resolvedEmail,
+                    phoneNumber = if (existingProfile.phoneNumber.isNullOrBlank() || existingProfile.phoneNumber.equals("EMPTY", ignoreCase = true)) {
+                        finalPhone.ifBlank { null }
+                    } else existingProfile.phoneNumber,
+                    authProvider = existingProfile.authProvider ?: "Google",
+                    updatedAt = nowStr
+                )
+            } else {
+                ProfileDto(
+                    id = userId,
+                    username = finalDisplayName,
+                    displayName = finalDisplayName,
+                    fullName = finalDisplayName,
+                    email = resolvedEmail,
+                    phoneNumber = finalPhone.ifBlank { null },
+                    authProvider = "Google",
+                    currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
+                    monthlyBudget = 0.0,
+                    privacyPolicyAccepted = false,
+                    updatedAt = nowStr
+                )
+            }
+
             try {
-                client.from("profiles").upsert(profile)
-            } catch (_: Exception) {}
+                client.from("profiles").upsert(profileToUpsert)
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice upserting profile in loginWithGoogleIdToken: ${e.message}")
+            }
+
+            existingProfile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (existingProfile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
 
             val user = SupabaseUser(
                 id = userId,
-                username = resolvedName,
+                username = finalDisplayName,
                 email = resolvedEmail,
-                phone = "",
+                phone = finalPhone,
                 provider = "Google",
                 accessToken = client.auth.currentAccessTokenOrNull() ?: ""
             )
@@ -471,17 +610,59 @@ class SupabaseAuthService @Inject constructor(
             val currentUser = client.auth.currentUserOrNull()
             val userId = currentUser?.id ?: UUID.randomUUID().toString()
 
+            val existingProfile: ProfileDto? = try {
+                if (userId.isNotBlank()) {
+                    client.from("profiles")
+                        .select {
+                            filter {
+                                eq("id", userId)
+                            }
+                        }
+                        .decodeSingleOrNull<ProfileDto>()
+                } else null
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice querying profiles in signInWithGoogleAccount: ${e.message}")
+                null
+            }
+
+            val finalName = existingProfile?.displayName?.ifBlank { null }
+                ?: existingProfile?.fullName?.ifBlank { null }
+                ?: existingProfile?.username?.ifBlank { null }
+                ?: resolvedName
+
+            val finalPhone = existingProfile?.cleanPhoneNumber?.ifBlank { null }
+                ?: cleanPhone.takeIf { !it.equals("EMPTY", ignoreCase = true) }?.ifBlank { null }
+                ?: ""
+
             // Upsert into Supabase Postgres public.profiles table
             val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
-            val profile = ProfileDto(
-                id = userId,
-                username = resolvedName,
-                fullName = resolvedName,
-                email = cleanEmail,
-                phoneNumber = cleanPhone,
-                authProvider = "Google Account (Verified)",
-                updatedAt = nowStr
-            )
+            val profile = if (existingProfile != null) {
+                existingProfile.copy(
+                    username = existingProfile.username?.ifBlank { null } ?: finalName,
+                    displayName = existingProfile.displayName?.ifBlank { null } ?: finalName,
+                    fullName = existingProfile.fullName?.ifBlank { null } ?: finalName,
+                    email = existingProfile.email?.ifBlank { null } ?: cleanEmail,
+                    phoneNumber = if (existingProfile.phoneNumber.isNullOrBlank() || existingProfile.phoneNumber.equals("EMPTY", ignoreCase = true)) {
+                        finalPhone.ifBlank { null }
+                    } else existingProfile.phoneNumber,
+                    authProvider = existingProfile.authProvider ?: "Google Account (Verified)",
+                    updatedAt = nowStr
+                )
+            } else {
+                ProfileDto(
+                    id = userId,
+                    username = finalName,
+                    displayName = finalName,
+                    fullName = finalName,
+                    email = cleanEmail,
+                    phoneNumber = finalPhone.ifBlank { null },
+                    authProvider = "Google Account (Verified)",
+                    currencyCode = com.waleed.vaulta.android.data.CurrencyManager.getSelectedCurrency().code,
+                    monthlyBudget = 0.0,
+                    privacyPolicyAccepted = false,
+                    updatedAt = nowStr
+                )
+            }
 
             try {
                 client.from("profiles").upsert(profile)
@@ -492,25 +673,35 @@ class SupabaseAuthService @Inject constructor(
             try {
                 client.auth.updateUser {
                     data {
-                        put("username", resolvedName)
-                        put("full_name", resolvedName)
-                        put("phone_number", cleanPhone)
+                        put("username", finalName)
+                        put("full_name", finalName)
+                        if (finalPhone.isNotBlank()) {
+                            put("phone_number", finalPhone)
+                        }
                         put("provider", "Google")
                     }
                 }
             } catch (_: Exception) {}
 
+            existingProfile?.currencyCode?.takeIf { it.isNotBlank() }?.let {
+                CurrencyManager.setCurrencyByCode(it, userId)
+            }
+            if (existingProfile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
+                sessionManager.setPrivacyPolicyAccepted(true, userId)
+            }
+
             val user = SupabaseUser(
                 id = userId,
-                username = resolvedName,
+                username = finalName,
                 email = cleanEmail,
-                phone = cleanPhone,
+                phone = finalPhone,
                 provider = "Google Account (Verified)",
                 accessToken = client.auth.currentAccessTokenOrNull() ?: ""
             )
 
             sessionManager.saveUser(
                 UserProfile(
+                    id = user.id,
                     name = user.username,
                     email = user.email,
                     phoneNumber = user.phone,
@@ -584,7 +775,7 @@ class SupabaseAuthService @Inject constructor(
                     displayName = cleanName.ifBlank { currentSession?.name ?: "" },
                     fullName = cleanName.ifBlank { currentSession?.name ?: "" },
                     email = if (cleanEmail.isNotBlank()) cleanEmail else (existingProfile?.email ?: currentUser.email ?: ""),
-                    phoneNumber = cleanPhone,
+                    phoneNumber = cleanPhone.ifBlank { null },
                     authProvider = existingProfile?.authProvider ?: currentSession?.authProvider ?: "Supabase Auth (Verified)",
                     avatarUrl = existingProfile?.avatarUrl,
                     currencyCode = existingProfile?.currencyCode ?: CurrencyManager.getSelectedCurrency().code,
