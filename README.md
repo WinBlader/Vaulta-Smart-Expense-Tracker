@@ -92,7 +92,7 @@
 - **100% Local & Private:** Evaluated strictly on-device in memory. Raw notification text is **never saved, logged, or uploaded** to the cloud.
 - **Noise & Scam Elimination:** Intelligently rejects OTPs, two-factor authentication codes, payment requests, mandates, promotional spam, and ending account balances (`Avl Bal`).
 - **Intelligent Deduplication & Direction Protection:** 25-second rolling window prevents duplicate entries across simultaneous SMS alerts, and guarantees that incoming credit alerts (e.g. "X paid you", "sent you", "received from", "credited") are strictly classified as Income and never produce duplicate or contradictory Expense rows.
-- **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"AJAZ Ahmad WANI Paid You 101.00"` to `"AJAZ Ahmad WANI"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
+- **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"ABC Paid You 101.00"` to `"ABC"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
 - **Slimmer Navigation & Standardized Typography:** Refined bottom navigation bar to a sleek 62dp height with compact padding, and standardized typography across all screens (14sp–16sp standard body/labels) eliminating uncomfortably small text.
 
 ### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
