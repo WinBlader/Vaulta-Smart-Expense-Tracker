@@ -111,7 +111,7 @@
 
 ## 📸 Visual App Showcase
 
-| 🌟 Brand Splash Screen | 🔐 Supabase Sign In | 📝 Registration (Email & Mobile) |
+| 🌟 Brand Splash Screen | 🔐 Secure Sign In | 📝 Registration (Email & Mobile) |
 | :---: | :---: | :---: |
 | <img src="screenshots/01_splash_screen.png" width="270" alt="Splash Screen"/> | <img src="screenshots/02_login_screen.png" width="270" alt="Login Screen"/> | <img src="screenshots/03_signup_screen.png" width="270" alt="Registration Screen"/> |
 | *Emerald branding splash with animated logo & security badge.* | *Sign in via Email, Mobile, Google One-Tap, or Guest Mode.* | *Tabbed registration with editable international country codes.* |
