@@ -1,5 +1,6 @@
 package com.waleed.vaulta.android.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.waleed.vaulta.android.data.CurrencyManager
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider
@@ -10,7 +11,9 @@ import com.waleed.vaulta.android.data.model.ExpenseSummary
 import com.waleed.vaulta.android.data.model.ProfileDto
 import com.waleed.vaulta.android.data.model.RemoteTransactionDto
 import com.waleed.vaulta.android.data.session.UserSessionManager
+import com.waleed.vaulta.android.data.sync.CloudSyncWorker
 import com.waleed.vaulta.android.utils.Utils
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import kotlinx.coroutines.Dispatchers
@@ -43,8 +46,30 @@ interface ExpenseRepository {
 class ExpenseRepositoryImpl @Inject constructor(
     private val dao: ExpenseDao,
     private val budgetManager: BudgetManager,
-    private val sessionManager: UserSessionManager
+    private val sessionManager: UserSessionManager,
+    @ApplicationContext private val context: Context? = null
 ) : ExpenseRepository {
+
+    private suspend fun ensureAuthenticatedSession(): String? {
+        if (!SupabaseClientProvider.isConfigured()) return null
+        val client = SupabaseClientProvider.client
+        try {
+            client.auth.awaitInitialization()
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Failed awaiting Supabase auth initialization: ${e.message}", e)
+        }
+
+        var currentAuth = client.auth.currentUserOrNull()
+        if (currentAuth == null && sessionManager.isLoggedIn()) {
+            try {
+                client.auth.refreshCurrentSession()
+                currentAuth = client.auth.currentUserOrNull()
+            } catch (e: Exception) {
+                Log.e("VaultaCloudSync", "Failed refreshing Supabase session: ${e.message}", e)
+            }
+        }
+        return currentAuth?.id
+    }
 
     override fun getAllExpenses(): Flow<List<ExpenseEntity>> {
         return sessionManager.currentUser.flatMapLatest { user ->
@@ -98,19 +123,25 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             val userKey = sessionManager.getCurrentUserKey()
             val stableUuid = if (expense.uuid.isNotBlank()) expense.uuid else UUID.randomUUID().toString()
+            val resolvedUserId = if (expense.userId.isBlank() || expense.userId == "guest") {
+                if (userKey.isNotBlank() && userKey != "guest") userKey else expense.userId
+            } else {
+                expense.userId
+            }
             val toSave = expense.copy(
-                userId = if (expense.userId.isBlank() || expense.userId == "guest") userKey else expense.userId,
+                userId = resolvedUserId,
                 uuid = stableUuid
             )
             dao.insertExpense(toSave)
-            val updated = dao.getAllExpenseForUser(userKey).first()
+            val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
 
             // Asynchronously sync to Supabase if authenticated (skip guest)
             pushTransactionToCloud(toSave)
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Failed inserting expense locally: ${e.message}", e)
             false
         }
     }
@@ -119,18 +150,24 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             val userKey = sessionManager.getCurrentUserKey()
             val stableUuid = if (expense.uuid.isNotBlank()) expense.uuid else UUID.randomUUID().toString()
+            val resolvedUserId = if (expense.userId.isBlank() || expense.userId == "guest") {
+                if (userKey.isNotBlank() && userKey != "guest") userKey else expense.userId
+            } else {
+                expense.userId
+            }
             val toSave = expense.copy(
-                userId = if (expense.userId.isBlank() || expense.userId == "guest") userKey else expense.userId,
+                userId = resolvedUserId,
                 uuid = stableUuid
             )
             dao.updateExpense(toSave)
-            val updated = dao.getAllExpenseForUser(userKey).first()
+            val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
 
             pushTransactionToCloud(toSave)
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Failed updating expense locally: ${e.message}", e)
             false
         }
     }
@@ -141,14 +178,14 @@ class ExpenseRepositoryImpl @Inject constructor(
             dao.deleteExpense(expense)
 
             if (SupabaseClientProvider.isConfigured() && userKey != "guest" && userKey.isNotBlank()) {
-                val currentAuthUser = SupabaseClientProvider.client.auth.currentUserOrNull()
-                if (currentAuthUser != null) {
+                val authUid = ensureAuthenticatedSession()
+                if (!authUid.isNullOrBlank()) {
                     try {
                         val client = SupabaseClientProvider.client
                         val targetUuid = expense.uuid.ifBlank { null }
                         client.from("transactions").delete {
                             filter {
-                                eq("user_id", currentAuthUser.id)
+                                eq("user_id", authUid)
                                 if (targetUuid != null) {
                                     eq("id", targetUuid)
                                 } else {
@@ -158,7 +195,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                             }
                         }
                     } catch (e: Exception) {
-                        Log.w("ExpenseRepository", "Notice during cloud transaction delete: ${e.message}")
+                        Log.e("VaultaCloudSync", "Notice during cloud transaction delete: ${e.message}", e)
                     }
                 }
             }
@@ -167,7 +204,8 @@ class ExpenseRepositoryImpl @Inject constructor(
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Failed deleting expense: ${e.message}", e)
             false
         }
     }
@@ -188,24 +226,33 @@ class ExpenseRepositoryImpl @Inject constructor(
         val currentUser = sessionManager.currentUser.value
         val fallbackEmail = currentUser?.email ?: ""
 
+        val authUid = ensureAuthenticatedSession()
+        val effectiveUserId = authUid ?: userId
+
         // 1. Claim any guest transactions created prior to sign-in
         try {
             dao.claimGuestExpenses(userId)
+            if (effectiveUserId != userId) {
+                dao.claimGuestExpenses(effectiveUserId)
+            }
         } catch (e: Exception) {
-            Log.w("ExpenseRepository", "Notice claiming guest expenses: ${e.message}")
+            Log.e("VaultaCloudSync", "Notice claiming guest expenses: ${e.message}", e)
         }
 
         // 2. Local legacy migration if email exists
         if (fallbackEmail.isNotBlank()) {
             try {
-                dao.migrateLegacyUserRows(userId, fallbackEmail)
+                dao.migrateLegacyUserRows(effectiveUserId, fallbackEmail)
+                if (effectiveUserId != userId) {
+                    dao.migrateLegacyUserRows(userId, fallbackEmail)
+                }
             } catch (e: Exception) {
-                Log.w("ExpenseRepository", "Notice migrating legacy rows: ${e.message}")
+                Log.e("VaultaCloudSync", "Notice migrating legacy rows: ${e.message}", e)
             }
         }
 
         // 3. Ensure any local rows missing a UUID get assigned a stable UUID
-        val initialLocalList = dao.getExpensesListForUser(userId, fallbackEmail)
+        val initialLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
         for (item in initialLocalList) {
             if (item.uuid.isBlank() && item.id != null) {
                 val generatedUuid = UUID.randomUUID().toString()
@@ -214,18 +261,17 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
 
         // 4. Supabase Cloud Sync & Restore (Authenticated Users Only)
-        if (SupabaseClientProvider.isConfigured()) {
+        if (SupabaseClientProvider.isConfigured() && !authUid.isNullOrBlank()) {
             val client = SupabaseClientProvider.client
-            val currentAuth = client.auth.currentUserOrNull()
 
             // 4a. Reinstall Hydration: Restore Cloud Profile details & Settings
             try {
                 val remoteProfile = client.from("profiles").select {
                     filter {
                         or {
-                            eq("id", userId)
-                            if (currentAuth != null) {
-                                eq("id", currentAuth.id)
+                            eq("id", authUid)
+                            if (userId != authUid) {
+                                eq("id", userId)
                             }
                             if (fallbackEmail.isNotBlank()) {
                                 eq("email", fallbackEmail)
@@ -255,7 +301,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                     }
 
                     val restoredCurrency = remoteProfile.currencyCode?.ifBlank { null } ?: "INR"
-                    CurrencyManager.setCurrencyByCode(restoredCurrency, userId)
+                    CurrencyManager.setCurrencyByCode(restoredCurrency, effectiveUserId)
 
                     val restoredBudget = remoteProfile.monthlyBudget ?: 0.0
                     if (restoredBudget > 0.0) {
@@ -263,28 +309,27 @@ class ExpenseRepositoryImpl @Inject constructor(
                     }
 
                     if (remoteProfile.privacyPolicyAccepted == true) {
-                        sessionManager.setPrivacyPolicyAccepted(true, userId)
+                        sessionManager.setPrivacyPolicyAccepted(true, effectiveUserId)
                     }
                 }
             } catch (e: Exception) {
-                Log.w("ExpenseRepository", "Notice restoring cloud profile: ${e.message}")
+                Log.e("VaultaCloudSync", "Notice restoring cloud profile: ${e.message}", e)
             }
 
             // 4b. Reinstall Hydration: Restore Cloud Transactions
             try {
-                val targetAuthId = currentAuth?.id ?: userId
                 val remoteTransactions = client.from("transactions").select {
                     filter {
                         or {
-                            eq("user_id", targetAuthId)
-                            if (targetAuthId != userId) {
+                            eq("user_id", authUid)
+                            if (userId != authUid) {
                                 eq("user_id", userId)
                             }
                         }
                     }
                 }.decodeList<RemoteTransactionDto>()
 
-                val currentLocalList = dao.getExpensesListForUser(userId, fallbackEmail)
+                val currentLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
 
                 for (remote in remoteTransactions) {
                     val localType = if (remote.isCreditOwe) {
@@ -316,7 +361,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                                     type = localType,
                                     date = formattedDate,
                                     note = remote.note,
-                                    userId = userId
+                                    userId = effectiveUserId
                                 )
                             )
                         }
@@ -335,7 +380,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                                     uuid = remote.id,
                                     type = localType,
                                     note = remote.note ?: matchWithoutUuid.note,
-                                    userId = userId
+                                    userId = effectiveUserId
                                 )
                             )
                         } else {
@@ -346,7 +391,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                                     amount = remote.amount,
                                     date = formattedDate,
                                     type = localType,
-                                    userId = userId,
+                                    userId = effectiveUserId,
                                     note = remote.note,
                                     uuid = remote.id
                                 )
@@ -356,24 +401,30 @@ class ExpenseRepositoryImpl @Inject constructor(
                 }
 
                 // 4c. Push any unsynced local rows to Cloud
-                val latestLocalList = dao.getExpensesListForUser(userId, fallbackEmail)
+                val latestLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
                 for (local in latestLocalList) {
-                    val existsRemotely = remoteTransactions.any { remote ->
+                    val matchingRemote = remoteTransactions.find { remote ->
                         remote.id == local.uuid ||
                         (local.title.equals(remote.title, ignoreCase = true) &&
                          Math.abs(local.amount - remote.amount) < 0.001 &&
                          Math.abs(Utils.getMillisFromDate(local.date) - remote.dateMillis) < 86400000L)
                     }
-                    if (!existsRemotely) {
+                    val isMissingOrOutdated = matchingRemote == null ||
+                        Math.abs(matchingRemote.amount - local.amount) >= 0.001 ||
+                        matchingRemote.title != local.title ||
+                        matchingRemote.note != local.note
+
+                    if (isMissingOrOutdated) {
                         pushTransactionToCloud(local)
                     }
                 }
 
-                val finalLocalList = dao.getExpensesListForUser(userId, fallbackEmail)
+                val finalLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
                 budgetManager.checkBudgetAndNotify(finalLocalList)
                 budgetManager.checkBalanceAndNotify(finalLocalList)
             } catch (e: Exception) {
-                Log.w("ExpenseRepository", "Notice during Supabase pull: ${e.message}")
+                Log.e("VaultaCloudSync", "Failed during Supabase pull/push sync: ${e.message}", e)
+                context?.let { CloudSyncWorker.enqueue(it) }
             }
         }
     }
@@ -382,7 +433,14 @@ class ExpenseRepositoryImpl @Inject constructor(
         if (!SupabaseClientProvider.isConfigured() || expense.userId == "guest" || expense.userId.isBlank()) {
             return
         }
-        val currentAuthUser = SupabaseClientProvider.client.auth.currentUserOrNull() ?: return
+
+        val authUid = ensureAuthenticatedSession()
+        if (authUid.isNullOrBlank()) {
+            Log.w("VaultaCloudSync", "No active Supabase auth session for pushTransactionToCloud (user=${expense.userId}), enqueuing WorkManager retry")
+            context?.let { CloudSyncWorker.enqueue(it) }
+            return
+        }
+
         try {
             val client = SupabaseClientProvider.client
             val stableUuid = if (expense.uuid.isNotBlank()) expense.uuid else UUID.randomUUID().toString()
@@ -417,7 +475,7 @@ class ExpenseRepositoryImpl @Inject constructor(
 
             val remoteDto = RemoteTransactionDto(
                 id = stableUuid,
-                userId = currentAuthUser.id,
+                userId = authUid,
                 title = expense.title,
                 amount = expense.amount,
                 type = normalizedType,
@@ -430,42 +488,47 @@ class ExpenseRepositoryImpl @Inject constructor(
             )
 
             client.from("transactions").upsert(remoteDto)
+            Log.d("VaultaCloudSync", "Successfully pushed transaction $stableUuid to Supabase for auth user $authUid")
         } catch (e: Exception) {
-            Log.w("ExpenseRepository", "Notice during Supabase push: ${e.message}")
+            Log.e("VaultaCloudSync", "Failed pushing transaction ${expense.uuid} to Supabase: ${e.message}", e)
+            context?.let { CloudSyncWorker.enqueue(it) }
         }
     }
 
-    override suspend fun clearCurrentUserData() = withContext(Dispatchers.IO) {
+    override suspend fun clearCurrentUserData(): Unit = withContext(Dispatchers.IO) {
         try {
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)
             budgetManager.resetBudgetForUser(userKey)
 
             if (SupabaseClientProvider.isConfigured() && userKey != "guest" && userKey.isNotBlank()) {
-                val currentAuthUser = SupabaseClientProvider.client.auth.currentUserOrNull()
-                if (currentAuthUser != null) {
+                val authUid = ensureAuthenticatedSession()
+                if (!authUid.isNullOrBlank()) {
                     try {
                         val client = SupabaseClientProvider.client
                         // 1. Delete all remote transactions for this user
                         client.from("transactions").delete {
                             filter {
-                                eq("user_id", currentAuthUser.id)
+                                eq("user_id", authUid)
                             }
                         }
                         // 2. Reset monthly_budget = 0.0 in public.profiles
                         client.from("profiles").update(mapOf("monthly_budget" to 0.0)) {
                             filter {
-                                eq("id", currentAuthUser.id)
+                                eq("id", authUid)
                             }
                         }
                     } catch (e: Exception) {
-                        Log.w("ExpenseRepository", "Notice during cloud reset: ${e.message}")
+                        Log.e("VaultaCloudSync", "Notice during cloud reset: ${e.message}", e)
                     }
                 }
             }
 
             budgetManager.checkBudgetAndNotify(emptyList())
             budgetManager.checkBalanceAndNotify(emptyList())
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Notice during clearCurrentUserData: ${e.message}", e)
+        }
+        Unit
     }
 }

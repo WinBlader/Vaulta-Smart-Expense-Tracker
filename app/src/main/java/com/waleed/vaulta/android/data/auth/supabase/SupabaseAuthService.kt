@@ -51,6 +51,30 @@ class SupabaseAuthService @Inject constructor(
     val sessionStatus: Flow<SessionStatus> = client.auth.sessionStatus
 
     /**
+     * Awaits Supabase Auth initialization and ensures session is restored.
+     * If session is null despite a signed-in local user, attempts refreshCurrentSession().
+     */
+    suspend fun ensureSessionInitialized(): String? = withContext(Dispatchers.IO) {
+        if (!SupabaseClientProvider.isConfigured()) return@withContext null
+        try {
+            client.auth.awaitInitialization()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed awaiting Supabase auth initialization: ${e.message}", e)
+        }
+
+        var currentAuth = client.auth.currentUserOrNull()
+        if (currentAuth == null && sessionManager.isLoggedIn()) {
+            try {
+                client.auth.refreshCurrentSession()
+                currentAuth = client.auth.currentUserOrNull()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed refreshing Supabase session: ${e.message}", e)
+            }
+        }
+        currentAuth?.id
+    }
+
+    /**
      * Signs up a new user via Supabase with Email, Password and full metadata.
      * Stored in both Supabase Auth user_metadata and the public profiles table.
      */
@@ -737,6 +761,7 @@ class SupabaseAuthService @Inject constructor(
         }
 
         try {
+            ensureSessionInitialized()
             val currentUser = client.auth.currentUserOrNull()
             val userId = currentUser?.id
             val currentSession = sessionManager.currentUser.value
@@ -888,6 +913,7 @@ class SupabaseAuthService @Inject constructor(
     suspend fun updatePrivacyPolicyAcceptedCloud(userId: String? = null): Unit = withContext(Dispatchers.IO) {
         if (!SupabaseClientProvider.isConfigured()) return@withContext
         try {
+            ensureSessionInitialized()
             val nowStr = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
             val resolvedUserId = userId?.ifBlank { null }
                 ?: client.auth.currentUserOrNull()?.id

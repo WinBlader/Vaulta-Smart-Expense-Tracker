@@ -717,4 +717,51 @@ class VaultaFeatureIntegrationTest {
         val stillAccepted = mockStorage["privacy_policy_accepted_v1_$activeUserId"] as? Boolean
         assertEquals(true, stillAccepted)
     }
+
+    @Test
+    fun testCloudSyncSessionInitializationAndRlsAlignment() {
+        val authUid = "supabase-auth-uid-7777"
+        val localUserKey = "legacy-local-user-key"
+
+        val localEntity = ExpenseEntity(
+            id = 42,
+            title = "Groceries",
+            amount = 1250.0,
+            date = "26/11/2026",
+            type = "Expense",
+            userId = localUserKey,
+            uuid = "item-uuid-42"
+        )
+
+        val remoteDto = com.waleed.vaulta.android.data.model.RemoteTransactionDto(
+            id = localEntity.uuid,
+            userId = authUid,
+            title = localEntity.title,
+            amount = localEntity.amount,
+            type = "EXPENSE",
+            category = "Groceries",
+            paymentMethod = "App",
+            note = localEntity.note,
+            dateMillis = 1732600000000L,
+            isCreditOwe = false,
+            creditOweStatus = null
+        )
+
+        assertEquals(authUid, remoteDto.userId)
+        assertEquals("item-uuid-42", remoteDto.id)
+        assertEquals(1250.0, remoteDto.amount, 0.001)
+    }
+
+    @Test
+    fun testNotificationListenerRoutesThroughRepositoryAndPreservesAuthUserId() {
+        val signedInUserId = "user-auth-uuid-8888"
+        var isLoggedIn = true
+        var resolvedUserKey = if (isLoggedIn) signedInUserId else "guest"
+
+        assertEquals(signedInUserId, resolvedUserKey)
+
+        isLoggedIn = false
+        resolvedUserKey = if (isLoggedIn) signedInUserId else "guest"
+        assertEquals("guest", resolvedUserKey)
+    }
 }

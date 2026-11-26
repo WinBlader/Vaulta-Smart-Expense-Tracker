@@ -27,7 +27,7 @@ android {
         applicationId = "com.waleed.vaulta.android"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
+        versionCode = 16
         versionName = "1.4.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -110,6 +110,9 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // AndroidX WorkManager for reliable offline & background cloud sync
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 }
 
 tasks.matching { it.name.contains("VersionControlInfo", ignoreCase = true) }.configureEach {

@@ -23,6 +23,7 @@ import com.waleed.vaulta.android.data.CurrencyManager
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.repository.ExpenseRepository
 import com.waleed.vaulta.android.data.session.UserSessionManager
+import com.waleed.vaulta.android.data.sync.CloudSyncWorker
 import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -129,7 +130,15 @@ class VaultaNotificationListenerService : NotificationListenerService() {
         ensureDependencies()
 
         val userKey = if (::userSessionManager.isInitialized) {
-            userSessionManager.getCurrentUserKey()
+            val key = userSessionManager.getCurrentUserKey()
+            if ((key.isBlank() || key == "guest") && userSessionManager.isLoggedIn()) {
+                val profile = userSessionManager.currentUser.value
+                val resolved = profile?.id?.takeIf { it.isNotBlank() && it != "guest" }
+                    ?: profile?.email?.takeIf { it.isNotBlank() }
+                resolved ?: key
+            } else {
+                key
+            }
         } else {
             "guest"
         }
@@ -234,6 +243,9 @@ class VaultaNotificationListenerService : NotificationListenerService() {
 
                 if (inserted) {
                     postConfirmationNotification(parsed)
+                    if (userKey != "guest" && userKey.isNotBlank()) {
+                        CloudSyncWorker.enqueue(applicationContext)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing notification in listener service", e)
