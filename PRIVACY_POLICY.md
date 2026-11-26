@@ -1,6 +1,6 @@
 # Privacy Policy for Vaulta - Smart Expense Tracker
 
-**Last updated:** November 25th, 2026
+**Last updated:** November 26th, 2026
 
 **Vaulta - Smart Expense Tracker** ("Vaulta", "we", "us", or "our"), developed by winblader.org, respects your privacy and is committed to protecting the personal data of our users. This Privacy Policy explains how your information is collected, used, and stored when you use the Vaulta Android application (`com.waleed.vaulta.android`).
 
@@ -19,18 +19,18 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 ### B. Financial & Expense Data
 - **Transaction & Credit/Owe Records:** Titles, amounts, categories, dates, transaction types (Expense, Income, Owed to You, or You Owe), payment methods, and optional transaction notes.
 - **Budget & Regional Preferences:** Monthly budget caps, spending limits, and selected currency preference (`currency_code`).
-- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, notes, monthly budget, and currency preference synchronize with our secure cloud database (Supabase) protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
+- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, notes, monthly budget, and currency preference synchronize with our secure backend protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.
-- **Notification Access Service (`NotificationListenerService` / `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature to read incoming **SMS / text messaging alerts** (e.g., Google Messages or your device's default SMS app). Evaluated 100% locally on-device and never transmitted to external servers. Chat apps (WhatsApp, Telegram, Instagram, Discord, etc.) are completely excluded.
+- **Notification Access Service (`NotificationListenerService` / `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE`):** Optional, strictly opt-in capability used solely for the on-device **Auto-Detect Transactions** feature to read incoming **SMS / text messaging alerts** (e.g., Google Messages or your device's default SMS app). User info is processed locally on your device and never transmitted to external servers. Chat apps (WhatsApp, Telegram, Instagram, Discord, etc.) are completely excluded.
 - **Vibration (`VIBRATE`):** Used to provide haptic feedback during alerts and reminders.
-- **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with Supabase authentication and cloud sync services.
+- **Network Access (`INTERNET`, `ACCESS_NETWORK_STATE`):** Used to communicate with backend authentication and cloud sync services.
 
 ### D. Optional On-Device Transaction Auto-Detection (SMS Only)
 When you explicitly enable **Auto-Detect Transactions** in your Profile settings and grant Android Notification Access:
 - **Strictly Limited to SMS Messaging Apps:** Auto-detection exclusively listens to notifications from standard SMS/text messaging apps (Google Messages, Samsung Messages, or your default SMS app). Vaulta **strictly blocks and ignores** chat, messaging, and social apps (including WhatsApp, Telegram, Instagram, Discord, Facebook Messenger, Slack, etc.), preventing casual conversations from ever being detected.
-- **100% Local On-Device Processing:** Vaulta parses bank, card, and payment SMS alerts entirely locally within your device's memory.
+- **100% Local On-Device Processing:** User info is processed locally on your device.
 - **Zero Raw Text Uploads:** Raw notification contents, sender details, and message bodies are **never saved, cached, or transmitted** to any cloud server or external third party.
 - **Strict Data Filtering:** Non-transaction notifications—including One-Time Passwords (OTPs), authentication codes, personal messaging texts, promotional alerts, and ending account balances—are strictly discarded and never logged.
 - **User Control & Revocation:** Auto-Detect is disabled by default. You can turn it off at any time directly in the Vaulta Profile screen or revoke Notification Access in your device's Android System Settings.
@@ -39,7 +39,7 @@ When you explicitly enable **Auto-Detect Transactions** in your Profile settings
 
 ## 2. Third-Party Services
 Vaulta integrates with trusted third-party services for authentication and database management:
-- **Supabase:** Provides secure user authentication, token management, and optional cloud database sync. (Privacy Policy: https://supabase.com/privacy)
+- **Secure Backend:** Provides secure user authentication, token management, and optional cloud database sync.
 - **Google Play Services / Google Identity:** Facilitates seamless "Continue with Google" sign-in via Android's Credential Manager. (Privacy Policy: https://policies.google.com/privacy)
 
 We do **not** use third-party advertising SDKs, and we do **not** sell, rent, or trade your personal or financial data to data brokers or third parties.
@@ -56,7 +56,7 @@ We do **not** use third-party advertising SDKs, and we do **not** sell, rent, or
 You maintain complete ownership of your data:
 - **Transaction Editing & Modification:** You can edit and update any logged transaction (including title, amount, type, and date) at any time directly in the app. Edits persist immediately to your local database and sync securely to your account.
 - **Individual Transaction Deletion:** You can delete any individual expense or income entry at any time via Swipe-to-Delete on the Home or Transaction List screens, or via the Delete button inside the Transaction Receipt dialog. A brief "Undo" action allows instant recovery if dismissed by mistake.
-- **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`. When signed in, this also permanently purges all remote transactions from Supabase and resets your cloud monthly budget to `0.0`.
+- **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`. When signed in, this also permanently purges all remote transactions from the secure backend and resets your cloud monthly budget to `0.0`.
 - **Operating System Deletion:** You can erase all locally stored data at any time by clearing the application's storage in your Android device's Settings (`Settings > Apps > Vaulta > Storage > Clear Data`) or by uninstalling the application.
 - **Account & Cloud Data Deletion:** To request the permanent deletion of your cloud account and associated profile data from our servers, send an email to **winblader.org@gmail.com** with the subject *"Account Deletion Request"*. Your account and data will be permanently removed within 30 days.
 
