@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
@@ -909,8 +910,12 @@ fun ProfileScreen(
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = LightGrey,
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
 
                         if (isAutoDetectEnabled) {
                             val badgeBg = if (isServiceConnected) Zinc.copy(alpha = 0.12f) else if (isNotificationAccessGranted) Color(0xFFFFF3E0) else MaterialTheme.colorScheme.surfaceVariant
