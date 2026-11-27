@@ -109,10 +109,14 @@
 - **Title Normalization & Row Collision Prevention:** Extracted titles are cleaned of trailing transaction text (e.g. normalizing `"ABC Paid You 101.00"` to `"ABC"`), and transaction list rows use weighted layout boundaries with ellipsis truncation to ensure titles never overlap amounts.
 - **Slimmer Navigation & Standardized Typography:** Refined bottom navigation bar to a sleek 62dp height with compact padding, and standardized typography across all screens (14sp–16sp standard body/labels) eliminating uncomfortably small text.
 
-### 7. 🗑️ Transaction Deletion (with Undo) & Data Reset
-- **Swipe-to-Delete:** Effortlessly dismiss any transaction from the Home feed or the full Transaction List using Material 3 `SwipeToDismissBox` with custom red warning backgrounds and trash icons.
+### 7. 🗑️ Safe Swipe-to-Delete (Hardened 55% Threshold) & Long-Press Action Menu (with Undo)
+- **Hardened Swipe-to-Delete Threshold:** Configured with an intentional `0.55f` (55% width) positional threshold on `SwipeToDismissBox` to completely eliminate accidental deletions caused by casual scrolling or edge-to-edge system back gestures. Swipe background smoothly transitions opacity, providing clear visual confirmation before a dismiss is triggered.
+- **Long-Press Transaction Action Menu:** Long-pressing any transaction card in either the Home feed or the full Transaction History triggers pleasant haptic feedback (`HapticFeedbackType.LongPress`) and opens a clean Material 3 modal bottom sheet with one-tap actions:
+  - **Edit Transaction:** Directly opens the transaction receipt editor.
+  - **Delete Transaction:** Safely deletes the transaction and launches the exact same instantaneous **Undo Snackbar** flow.
+  - **Cancel:** Dismisses the menu.
 - **Item Detail Removal:** Direct **Delete Transaction** action button inside the itemized receipt view with safety confirmation.
-- **Instant Undo:** Vaulta-branded snackbar with a 4.5-second **UNDO** button to instantly restore accidentally deleted entries.
+- **Instant Undo:** Vaulta-branded snackbar with a 4.5-second **UNDO** button to instantly restore accidentally deleted entries across local RoomDB and Supabase cloud.
 - **In-App "Reset Everything":** Double-confirmed safety reset option in the Profile screen under *Data & Privacy* to permanently wipe local transactions, reset budgets to zero, and clear auto-detect preferences for the active user account.
 
 ### 8. ✏️ Full Transaction Editing

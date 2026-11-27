@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.waleed.vaulta.android.feature.transactionlist
 
@@ -13,6 +13,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -108,7 +111,23 @@ fun TransactionListScreen(
     var showFilterSheet by remember { mutableStateOf(false) }
     var showCustomDatePicker by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var actionMenuItem by remember { mutableStateOf<ExpenseEntity?>(null) }
     var showExportDialog by remember { mutableStateOf(false) }
+
+    actionMenuItem?.let { item ->
+        TransactionActionMenuBottomSheet(
+            item = item,
+            onEdit = {
+                selectedItemForReceipt = item
+                actionMenuItem = null
+            },
+            onDelete = {
+                viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(item))
+                actionMenuItem = null
+            },
+            onDismiss = { actionMenuItem = null }
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.navigationEvent.collect { event ->
@@ -979,32 +998,36 @@ fun TransactionListScreen(
                         key = { it.id ?: 0 }
                     ) { item ->
                         val currentItem by rememberUpdatedState(item)
+                        val haptic = LocalHapticFeedback.current
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { dismissValue ->
                                 if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
                                     viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(currentItem))
                                     true
                                 } else false
-                            }
+                            },
+                            positionalThreshold = { totalDistance -> totalDistance * 0.55f }
                         )
 
                         SwipeToDismissBox(
                             state = dismissState,
                             backgroundContent = {
                                 val alignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                                val targetProgress = kotlin.math.abs(dismissState.progress)
+                                val bgAlpha = if (targetProgress >= 0.55f) 1f else (targetProgress * 1.5f).coerceIn(0.1f, 0.7f)
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding(vertical = 4.dp)
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Red)
+                                        .background(Red.copy(alpha = bgAlpha))
                                         .padding(horizontal = 20.dp),
                                     contentAlignment = alignment
                                 ) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_delete),
                                         contentDescription = "Delete",
-                                        tint = Color.White,
+                                        tint = Color.White.copy(alpha = if (targetProgress >= 0.55f) 1f else 0.7f),
                                         modifier = Modifier.size(24.dp)
                                     )
                                 }
@@ -1027,9 +1050,15 @@ fun TransactionListScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable {
-                                                selectedItemForReceipt = item
-                                            }
+                                            .combinedClickable(
+                                                onClick = {
+                                                    selectedItemForReceipt = item
+                                                },
+                                                onLongClick = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    actionMenuItem = item
+                                                }
+                                            )
                                     ) {
                                         TransactionItem(
                                             title = item.title,

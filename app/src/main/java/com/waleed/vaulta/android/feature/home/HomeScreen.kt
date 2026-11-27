@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 
 package com.waleed.vaulta.android.feature.home
 
@@ -7,6 +7,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import com.waleed.vaulta.android.feature.transactionlist.TransactionActionMenuBottomSheet
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -123,6 +128,22 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     var showAddCreditOweDialog by remember { mutableStateOf(false) }
     var showSplitBillDialog by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var actionMenuItem by remember { mutableStateOf<ExpenseEntity?>(null) }
+
+    actionMenuItem?.let { item ->
+        TransactionActionMenuBottomSheet(
+            item = item,
+            onEdit = {
+                selectedItemForReceipt = item
+                actionMenuItem = null
+            },
+            onDelete = {
+                viewModel.deleteExpense(item)
+                actionMenuItem = null
+            },
+            onDismiss = { actionMenuItem = null }
+        )
+    }
 
     if (showAddCreditOweDialog) {
         AddCreditOweDialog(
@@ -315,6 +336,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 onSetBudgetClicked = { showBudgetDialog = true },
                 onSpendsDashboardClicked = { viewModel.onEvent(HomeUiEvent.OnSpendsDashboardClicked) },
                 onItemClicked = { selectedItemForReceipt = it },
+                onItemLongClicked = { actionMenuItem = it },
                 onDeleteClicked = { viewModel.deleteExpense(it) },
                 onSeeAllClicked = {
                     viewModel.onEvent(HomeUiEvent.OnSeeAllClicked)
@@ -549,6 +571,7 @@ fun TransactionList(
     onSetBudgetClicked: (() -> Unit)? = null,
     onSpendsDashboardClicked: (() -> Unit)? = null,
     onItemClicked: ((ExpenseEntity) -> Unit)? = null,
+    onItemLongClicked: ((ExpenseEntity) -> Unit)? = null,
     onDeleteClicked: ((ExpenseEntity) -> Unit)? = null,
     onSeeAllClicked: () -> Unit
 ) {
@@ -692,32 +715,36 @@ fun TransactionList(
             key = { item -> item.id ?: 0 }
         ) { item ->
             val currentItem by rememberUpdatedState(item)
+            val haptic = LocalHapticFeedback.current
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = { dismissValue ->
                     if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
                         onDeleteClicked?.invoke(currentItem)
                         true
                     } else false
-                }
+                },
+                positionalThreshold = { totalDistance -> totalDistance * 0.55f }
             )
 
             SwipeToDismissBox(
                 state = dismissState,
                 backgroundContent = {
                     val alignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                    val targetProgress = kotlin.math.abs(dismissState.progress)
+                    val bgAlpha = if (targetProgress >= 0.55f) 1f else (targetProgress * 1.5f).coerceIn(0.1f, 0.7f)
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Red)
+                            .background(Red.copy(alpha = bgAlpha))
                             .padding(horizontal = 20.dp),
                         contentAlignment = alignment
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_delete),
                             contentDescription = "Delete",
-                            tint = Color.White,
+                            tint = Color.White.copy(alpha = if (targetProgress >= 0.55f) 1f else 0.7f),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -740,7 +767,13 @@ fun TransactionList(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onItemClicked?.invoke(item) }
+                                .combinedClickable(
+                                    onClick = { onItemClicked?.invoke(item) },
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        onItemLongClicked?.invoke(item)
+                                    }
+                                )
                         ) {
                             TransactionItem(
                                 title = item.title,
