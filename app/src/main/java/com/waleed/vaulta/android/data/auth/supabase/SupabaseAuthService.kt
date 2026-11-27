@@ -260,6 +260,9 @@ class SupabaseAuthService @Inject constructor(
             if (profile?.privacyPolicyAccepted == true && userId.isNotBlank()) {
                 sessionManager.setPrivacyPolicyAccepted(true, userId)
             }
+            if (profile?.isSearchable != null && userId.isNotBlank()) {
+                sessionManager.setIsSearchable(profile.isSearchable, userId)
+            }
 
             val user = SupabaseUser(
                 id = userId,
@@ -1025,6 +1028,79 @@ class SupabaseAuthService @Inject constructor(
             Log.w(TAG, "Notice during contact lookup for '$cleanQuery': ${e.message}")
             com.waleed.vaulta.android.data.model.ContactLookupResult(found = false)
         }
+    }
+
+    /**
+     * Searches registered Vaulta users by name, email, or mobile number using search_vaulta_users RPC.
+     */
+    suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.length < 2 || !SupabaseClientProvider.isConfigured() || !sessionManager.isLoggedIn()) {
+            return@withContext emptyList()
+        }
+        try {
+            ensureSessionInitialized()
+            val rpcParams = buildJsonObject {
+                put("p_query", cleanQuery)
+            }
+            val result = client.postgrest.rpc("search_vaulta_users", rpcParams).decodeAs<List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>>()
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice during global user search for '$cleanQuery': ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Updates discoverability toggle in public.profiles.
+     */
+    suspend fun setIsSearchable(isSearchable: Boolean): Boolean = withContext(Dispatchers.IO) {
+        sessionManager.setIsSearchable(isSearchable)
+        if (!SupabaseClientProvider.isConfigured() || !sessionManager.isLoggedIn()) return@withContext true
+        try {
+            ensureSessionInitialized()
+            val uid = client.auth.currentUserOrNull()?.id ?: return@withContext true
+            client.from("profiles").update(mapOf("is_searchable" to isSearchable)) {
+                filter { eq("id", uid) }
+            }
+            Log.d(TAG, "Successfully updated is_searchable = $isSearchable in profiles")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice updating is_searchable in profiles: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Permanently deletes authenticated user account and data.
+     */
+    suspend fun deleteOwnAccount(): Boolean = withContext(Dispatchers.IO) {
+        if (!SupabaseClientProvider.isConfigured() || !sessionManager.isLoggedIn()) {
+            return@withContext true
+        }
+        try {
+            ensureSessionInitialized()
+            client.postgrest.rpc("delete_own_account")
+            Log.d(TAG, "delete_own_account RPC executed successfully")
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice executing delete_own_account RPC: ${e.message}. Attempting direct cleanup.")
+            try {
+                val uid = client.auth.currentUserOrNull()?.id
+                if (uid != null) {
+                    client.from("transactions").delete { filter { eq("user_id", uid) } }
+                    client.from("credit_owe").delete { filter { eq("user_id", uid) } }
+                    client.from("shared_splits").delete { filter { eq("creator_id", uid) } }
+                    client.from("user_balance").delete { filter { eq("userId", uid) } }
+                    client.from("profiles").delete { filter { eq("id", uid) } }
+                }
+            } catch (pe: Exception) {
+                Log.w(TAG, "Notice during direct cloud profile cleanup: ${pe.message}")
+            }
+        }
+        try {
+            client.auth.signOut()
+        } catch (_: Exception) {}
+        true
     }
 
     private fun saveToSession(user: SupabaseUser) {

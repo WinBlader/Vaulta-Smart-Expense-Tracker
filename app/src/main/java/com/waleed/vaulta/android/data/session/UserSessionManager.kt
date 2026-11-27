@@ -33,6 +33,7 @@ class UserSessionManager @Inject constructor(
         private const val KEY_PRIVACY_POLICY_ACCEPTED = "privacy_policy_accepted_v1"
         private const val KEY_PRIVACY_POLICY_ACCEPTED_AT = "privacy_policy_accepted_v1_timestamp"
         private const val KEY_INITIAL_BALANCE = "initial_balance_amount"
+        private const val KEY_IS_SEARCHABLE = "is_searchable"
     }
 
     private val _themeMode = MutableStateFlow(prefs.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM")
@@ -49,6 +50,28 @@ class UserSessionManager @Inject constructor(
     private fun getInitialBalanceKey(userKey: String? = null): String {
         val key = userKey?.ifBlank { null } ?: getCurrentUserKey()
         return "${KEY_INITIAL_BALANCE}_$key"
+    }
+
+    private fun getSearchableKey(userKey: String? = null): String {
+        val key = userKey?.ifBlank { null } ?: getCurrentUserKey()
+        return "${KEY_IS_SEARCHABLE}_$key"
+    }
+
+    private val _isSearchable = MutableStateFlow(prefs.getBoolean(getSearchableKey(), true))
+    val isSearchable: StateFlow<Boolean> = _isSearchable.asStateFlow()
+
+    fun getIsSearchable(userKey: String? = null): Boolean {
+        val key = getSearchableKey(userKey)
+        return prefs.getBoolean(key, true)
+    }
+
+    fun setIsSearchable(searchable: Boolean, userKey: String? = null) {
+        val key = getSearchableKey(userKey)
+        prefs.edit().putBoolean(key, searchable).apply()
+        val currentKey = getCurrentUserKey()
+        if (userKey == null || userKey == currentKey) {
+            _isSearchable.value = searchable
+        }
     }
 
     private fun loadInitialBalance(userKey: String? = null): Double {
@@ -271,6 +294,21 @@ class UserSessionManager @Inject constructor(
             .apply()
         _currentUser.value = null
         _initialBalance.value = 0.0
+    }
+
+    /**
+     * Completely wipes active user preferences, balance figures, and discoverability settings.
+     */
+    fun wipeAllUserData() {
+        val userKey = getCurrentUserKey()
+        prefs.edit()
+            .remove(getInitialBalanceKey(userKey))
+            .remove(getSearchableKey(userKey))
+            .remove("${KEY_PRIVACY_POLICY_ACCEPTED}_$userKey")
+            .remove("${KEY_PRIVACY_POLICY_ACCEPTED_AT}_$userKey")
+            .apply()
+        _isSearchable.value = true
+        logout()
     }
 
     // ==========================================

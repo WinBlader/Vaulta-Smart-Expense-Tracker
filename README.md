@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.2%20(Build%2021)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.2"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.3%20(Build%2022)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.3"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -42,14 +42,18 @@
 
 ## ✨ Key Features 
 
-### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Dedicated Credit/Owe (v1.5.2)
+### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Dedicated Credit/Owe (v1.5.3)
 - **Fast Transaction Logging:** Dedicated, distraction-free entry layouts optimized separately for income streams, expenses, and Credit/Owe obligations.
-- **Dedicated Credit & Owe Ledger (v1.5.2):** Credit and Owe obligations are stored in a dedicated `credit_owe` database table, completely separating them from personal expenses. Your daily spending, monthly budget calculations, and income charts remain 100% clean and unpolluted.
+- **Global Vaulta User Search & Discoverability Toggle (v1.5.3):** Live autocomplete search powered by `search_vaulta_users` RPC allows finding registered friends instantly by display name, mobile number, or email. Users can toggle discoverability anytime in Profile via *"Allow friends to find me by name"*.
+- **In-App Account & Cloud Data Deletion (v1.5.3):** Direct, red-accented **Delete Account & All Data** button in Profile with an explicit confirmation dialog permanently wipes all local RoomDB records, cloud backups, and user credentials from the secure backend.
+- **Record Delete Confirmation Dialogs (v1.5.3):** Every record deletion—including swipe-to-delete (which snaps the row back if canceled), long-press actions, detail sheets, Credit/Owe records, and Split Bill shares—is protected by an explicit confirmation dialog (`Delete Record?`).
+- **Enhanced Counterparty Parsing on Auto-Detected Transactions (v1.5.3):** Automatically extracts merchants, VPAs, and senders/recipients from Indian UPI & bank notifications, formatting titles as `"Paid to <Merchant/Recipient>"` for debits and `"Received from <Sender>"` for credits.
+- **Dedicated Credit & Owe Ledger:** Credit and Owe obligations are stored in a dedicated `credit_owe` database table, completely separating them from personal expenses. Your daily spending, monthly budget calculations, and income charts remain 100% clean and unpolluted.
 - **Split Bill (Splitwise-Style Group Splitter):** Dedicated Indigo FAB action allowing you to split group bills (e.g., dinners, shared trips, apartment rent) between multiple participants.
   - Supports **Equal Split** (automatic even distribution among all participants) and **Custom Split** (per-person custom amounts with live total validation).
   - Clean separation: Split bill shares are tracked exclusively within `shared_splits` without creating redundant fake personal expense records.
-  - **Participant Management & Contact Picker (v1.5.2):** Enter participants manually or tap **Pick Contact** to select directly from your device address book with smooth runtime permissions.
-- **Group & Individual Settle Up (v1.5.2):** In the Transaction List screen, group splits display a **Settle All** button for closing the entire bill in one click, alongside individual participant **Settle** actions. Bilateral Credit / Owe cards include one-tap settlement and edit/delete controls.
+  - **Participant Management, Contact Picker & Live User Search (v1.5.3):** Pick from device contacts or choose from live Vaulta user search results with instant counterparty ID binding.
+- **Group & Individual Settle Up:** In the Transaction List screen, group splits display a **Settle All** button for closing the entire bill in one click, alongside individual participant **Settle** actions. Bilateral Credit / Owe cards include one-tap settlement and edit/delete controls.
 - **Live Vaulta Contact Lookup:** When adding participants in Split Bill or Credit & Owe, entering an email or mobile number triggers a debounced live search against registered Vaulta accounts. If a registered user is found, a verified match badge (`Vaulta user found: {Name} ✓`) is displayed, their name is auto-filled if blank, and the obligation is bound directly to their user ID.
 - **Retroactive Profile Contact Linking:** Adding or updating your phone number or email address in your Profile immediately triggers background auto-linking for all past or pending splits and Credit/Owe obligations assigned to that contact identifier.
 - **Universal Shared Credit/Owe Ledger:**

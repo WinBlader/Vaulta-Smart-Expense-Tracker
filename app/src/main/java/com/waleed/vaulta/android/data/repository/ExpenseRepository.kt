@@ -59,6 +59,8 @@ interface ExpenseRepository {
     suspend fun deleteSharedSplit(id: String): Boolean
     suspend fun syncSharedSplits()
     suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult
+    suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>
+    suspend fun setIsSearchable(isSearchable: Boolean): Boolean
 
     // Dedicated Credit / Owe Ledger
     fun getAllCreditOwe(): Flow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>>
@@ -958,6 +960,14 @@ class ExpenseRepositoryImpl @Inject constructor(
 
     override suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult {
         return supabaseAuthService.lookupVaultaContact(query)
+    }
+
+    override suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> {
+        return supabaseAuthService.searchVaultaUsers(query)
+    }
+
+    override suspend fun setIsSearchable(isSearchable: Boolean): Boolean {
+        return supabaseAuthService.setIsSearchable(isSearchable)
     }
 
     private suspend fun pushSharedSplitToCloud(split: SharedSplitEntity) {

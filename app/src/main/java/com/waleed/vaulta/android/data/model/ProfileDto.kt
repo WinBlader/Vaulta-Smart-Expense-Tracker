@@ -18,6 +18,7 @@ data class ProfileDto(
     @SerialName("current_balance") val currentBalance: Double? = 0.0,
     @SerialName("currency_code") val currencyCode: String? = "INR",
     @SerialName("privacy_policy_accepted") val privacyPolicyAccepted: Boolean? = false,
+    @SerialName("is_searchable") val isSearchable: Boolean? = true,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null
 ) {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +57,7 @@ fun SplitBillDialog(
     currentUserName: String,
     currentUserContact: String,
     onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
+    onSearchUsers: (suspend (String) -> List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>)? = null,
     onDismiss: () -> Unit,
     onSaveSplits: (List<SharedSplitEntity>) -> Unit
 ) {
@@ -75,6 +77,9 @@ fun SplitBillDialog(
     var participants by remember {
         mutableStateOf(listOf(SplitParticipant(), SplitParticipant()))
     }
+
+    var activeSearchParticipantIndex by remember { mutableStateOf<Int?>(null) }
+    var participantSearchSuggestions by remember { mutableStateOf<List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>>(emptyList()) }
 
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -477,6 +482,100 @@ fun SplitBillDialog(
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                         )
+                                    }
+                                }
+
+                                LaunchedEffect(participant.name, participant.contact) {
+                                    val query = participant.name.trim().ifEmpty { participant.contact.trim() }
+                                    if (query.length < 2 || onSearchUsers == null) {
+                                        if (activeSearchParticipantIndex == index) {
+                                            participantSearchSuggestions = emptyList()
+                                            activeSearchParticipantIndex = null
+                                        }
+                                        return@LaunchedEffect
+                                    }
+                                    kotlinx.coroutines.delay(300)
+                                    val results = try {
+                                        onSearchUsers(query)
+                                    } catch (_: Exception) {
+                                        emptyList()
+                                    }
+                                    if (results.isNotEmpty()) {
+                                        activeSearchParticipantIndex = index
+                                        participantSearchSuggestions = results.filter { it.userId != currentUserId && it.userId != participant.counterpartyId }
+                                    }
+                                }
+
+                                if (activeSearchParticipantIndex == index && participantSearchSuggestions.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(6.dp)) {
+                                            Text(
+                                                text = "Matching Vaulta Users:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF6366F1),
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                            participantSearchSuggestions.take(4).forEach { userResult ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .clickable {
+                                                            participants = participants.toMutableList().also { list ->
+                                                                if (index < list.size) {
+                                                                    list[index] = list[index].copy(
+                                                                        name = userResult.displayName,
+                                                                        contact = userResult.maskedContact ?: list[index].contact,
+                                                                        counterpartyId = userResult.userId
+                                                                    )
+                                                                }
+                                                            }
+                                                            participantSearchSuggestions = emptyList()
+                                                            activeSearchParticipantIndex = null
+                                                        }
+                                                        .padding(horizontal = 6.dp, vertical = 5.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Person,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF6366F1),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = userResult.displayName,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        if (!userResult.maskedContact.isNullOrBlank()) {
+                                                            Text(
+                                                                text = userResult.maskedContact,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                    }
+                                                    Text(
+                                                        text = "Select ✓",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color(0xFF10B981),
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 

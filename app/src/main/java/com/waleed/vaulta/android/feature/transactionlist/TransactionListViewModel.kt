@@ -253,6 +253,14 @@ class TransactionListViewModel @Inject constructor(
         }
     }
 
+    suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult {
+        return expenseRepository.lookupVaultaContact(query)
+    }
+
+    suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> {
+        return expenseRepository.searchVaultaUsers(query)
+    }
+
     fun deleteSharedSplit(id: String) {
         viewModelScope.launch {
             val success = expenseRepository.deleteSharedSplit(id)

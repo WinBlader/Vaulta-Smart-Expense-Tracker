@@ -32,6 +32,7 @@ data class ProfileUiState(
     val showAutoDetectDisclosureDialog: Boolean = false,
     val showDeviceSetupInfoDialog: Boolean = false,
     val showResetEverythingDialog: Boolean = false,
+    val showDeleteAccountDialog: Boolean = false,
     val message: String? = null
 )
 
@@ -47,6 +48,13 @@ class ProfileViewModel @Inject constructor(
     val user: StateFlow<UserProfile?> = authRepository.currentUser
     val themeMode: StateFlow<String> = authRepository.themeMode
     val selectedCurrency: StateFlow<CurrencyItem> = CurrencyManager.selectedCurrency
+    val isSearchable: StateFlow<Boolean> = sessionManager.isSearchable
+
+    fun toggleSearchable(enabled: Boolean) {
+        viewModelScope.launch {
+            expenseRepository.setIsSearchable(enabled)
+        }
+    }
 
     val expenses = expenseRepository.getAllExpenses().stateIn(
         viewModelScope,
@@ -329,6 +337,38 @@ class ProfileViewModel @Inject constructor(
                     }
                 }
             }
+
+            is ProfileUiEvent.OnRequestDeleteAccount -> {
+                _uiState.value = _uiState.value.copy(showDeleteAccountDialog = true)
+            }
+
+            is ProfileUiEvent.OnDismissDeleteAccount -> {
+                _uiState.value = _uiState.value.copy(showDeleteAccountDialog = false)
+            }
+
+            is ProfileUiEvent.OnConfirmDeleteAccount -> {
+                _uiState.value = _uiState.value.copy(showDeleteAccountDialog = false)
+                viewModelScope.launch {
+                    try {
+                        if (sessionManager.getCurrentUserKey() != "guest" && sessionManager.isLoggedIn()) {
+                            authRepository.deleteOwnAccount()
+                        }
+                        expenseRepository.clearCurrentUserData()
+                        sessionManager.wipeAllUserData()
+                        budgetRepository.setMonthlyBudget(0.0, emptyList())
+                        val userKey = sessionManager.getCurrentUserKey()
+                        NotificationAccessHelper.resetAutoDetect(context, userKey)
+                        _isAutoDetectEnabled.value = false
+                        com.waleed.vaulta.android.utils.VaultaToast.show(message = "Account & all data deleted successfully.")
+                        _navigationEvent.emit(ProfileNavigationEvent.NavigateToLogin)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProfileViewModel", "Account deletion error", e)
+                        sessionManager.wipeAllUserData()
+                        com.waleed.vaulta.android.utils.VaultaToast.show(message = "Account deleted.")
+                        _navigationEvent.emit(ProfileNavigationEvent.NavigateToLogin)
+                    }
+                }
+            }
         }
     }
 }
@@ -358,4 +398,7 @@ sealed class ProfileUiEvent : UiEvent() {
     data object OnRequestResetEverything : ProfileUiEvent()
     data object OnDismissResetEverything : ProfileUiEvent()
     data object OnConfirmResetEverything : ProfileUiEvent()
+    data object OnRequestDeleteAccount : ProfileUiEvent()
+    data object OnDismissDeleteAccount : ProfileUiEvent()
+    data object OnConfirmDeleteAccount : ProfileUiEvent()
 }

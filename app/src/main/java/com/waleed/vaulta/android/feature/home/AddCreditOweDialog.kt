@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +40,7 @@ fun AddCreditOweDialog(
     initialEntity: CreditOweEntity? = null,
     onDismiss: () -> Unit,
     onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
+    onSearchUsers: (suspend (String) -> List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>)? = null,
     onSettle: (() -> Unit)? = null,
     onSave: (personName: String, amount: Double, type: String, note: String?, contact: String?, counterpartyId: String?) -> Unit
 ) {
@@ -58,6 +61,8 @@ fun AddCreditOweDialog(
     var counterpartyId by remember { mutableStateOf<String?>(initialEntity?.counterpartyId) }
     var lookupResult by remember { mutableStateOf<com.waleed.vaulta.android.data.model.ContactLookupResult?>(null) }
     var isLookingUp by remember { mutableStateOf(false) }
+    var searchSuggestions by remember { mutableStateOf<List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>>(emptyList()) }
+    var isSearchingUsers by remember { mutableStateOf(false) }
 
     var showContactPicker by remember { mutableStateOf(false) }
 
@@ -102,6 +107,24 @@ fun AddCreditOweDialog(
         } else {
             counterpartyId = null
         }
+    }
+
+    LaunchedEffect(personName, personContact) {
+        val query = personName.trim().ifEmpty { personContact.trim() }
+        if (query.length < 2 || onSearchUsers == null) {
+            searchSuggestions = emptyList()
+            isSearchingUsers = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(300)
+        isSearchingUsers = true
+        val results = try {
+            onSearchUsers(query)
+        } catch (_: Exception) {
+            emptyList()
+        }
+        isSearchingUsers = false
+        searchSuggestions = results.filter { it.userId != counterpartyId }
     }
 
     val calendar = Calendar.getInstance().apply { timeInMillis = date }
@@ -265,6 +288,77 @@ fun AddCreditOweDialog(
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
+                    }
+                }
+
+                // Autocomplete dropdown of matching Vaulta users
+                if (searchSuggestions.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(6.dp)) {
+                            Text(
+                                text = "Matching Vaulta Users:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFF59E0B),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                            searchSuggestions.take(4).forEach { userResult ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            personName = userResult.displayName
+                                            counterpartyId = userResult.userId
+                                            if (!userResult.maskedContact.isNullOrBlank()) {
+                                                personContact = userResult.maskedContact
+                                            }
+                                            searchSuggestions = emptyList()
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = userResult.displayName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (!userResult.maskedContact.isNullOrBlank()) {
+                                            Text(
+                                                text = userResult.maskedContact,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.Gray
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "Select ✓",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF10B981),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

@@ -5,6 +5,7 @@ package com.waleed.vaulta.android.feature.transactionlist
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.material3.Icon
 import androidx.compose.animation.AnimatedVisibility
@@ -99,6 +100,12 @@ import com.waleed.vaulta.android.utils.ReceiptExportManager
 import com.waleed.vaulta.android.utils.Utils
 import com.waleed.vaulta.android.widget.ExpenseTextView
 
+sealed class DeleteRecordTarget {
+    data class Transaction(val item: ExpenseEntity) : DeleteRecordTarget()
+    data class CreditOwe(val id: String) : DeleteRecordTarget()
+    data class SharedSplit(val id: String) : DeleteRecordTarget()
+}
+
 @Composable
 fun TransactionListScreen(
     navController: NavController,
@@ -119,7 +126,8 @@ fun TransactionListScreen(
         com.waleed.vaulta.android.feature.home.AddCreditOweDialog(
             initialEntity = co,
             onDismiss = { editingCreditOwe = null },
-            onLookupContact = null,
+            onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
+            onSearchUsers = { query -> viewModel.searchVaultaUsers(query) },
             onSettle = {
                 viewModel.settleCreditOwe(co.id)
                 editingCreditOwe = null
@@ -139,6 +147,8 @@ fun TransactionListScreen(
         )
     }
 
+    var recordToDelete by remember { mutableStateOf<DeleteRecordTarget?>(null) }
+
     actionMenuItem?.let { item ->
         TransactionActionMenuBottomSheet(
             item = item,
@@ -147,7 +157,7 @@ fun TransactionListScreen(
                 actionMenuItem = null
             },
             onDelete = {
-                viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(item))
+                recordToDelete = DeleteRecordTarget.Transaction(item)
                 actionMenuItem = null
             },
             onDismiss = { actionMenuItem = null }
@@ -167,8 +177,60 @@ fun TransactionListScreen(
         TransactionReceiptDialog(
             item = item,
             onEdit = { viewModel.onEvent(TransactionListUiEvent.OnUpdateTransaction(it)) },
-            onDelete = { viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(it)) },
+            onDelete = {
+                recordToDelete = DeleteRecordTarget.Transaction(it)
+                selectedItemForReceipt = null
+            },
             onDismiss = { selectedItemForReceipt = null }
+        )
+    }
+
+    if (recordToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { recordToDelete = null },
+            title = {
+                Text(
+                    text = "Delete Record?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Red
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete this record?",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        when (val target = recordToDelete) {
+                            is DeleteRecordTarget.Transaction -> viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(target.item))
+                            is DeleteRecordTarget.CreditOwe -> viewModel.deleteCreditOwe(target.id)
+                            is DeleteRecordTarget.SharedSplit -> viewModel.deleteSharedSplit(target.id)
+                            null -> {}
+                        }
+                        recordToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { recordToDelete = null }
+                ) {
+                    Text(text = "Cancel", color = LightGrey)
+                }
+            }
         )
     }
 
@@ -946,7 +1008,7 @@ fun TransactionListScreen(
                                                     }
 
                                                     IconButton(
-                                                        onClick = { viewModel.deleteSharedSplit(split.id) },
+                                                        onClick = { recordToDelete = DeleteRecordTarget.SharedSplit(split.id) },
                                                         modifier = Modifier.size(26.dp)
                                                     ) {
                                                         Icon(
@@ -1142,7 +1204,7 @@ fun TransactionListScreen(
                                             }
 
                                             IconButton(
-                                                onClick = { viewModel.deleteCreditOwe(co.id) },
+                                                onClick = { recordToDelete = DeleteRecordTarget.CreditOwe(co.id) },
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(
@@ -1221,8 +1283,8 @@ fun TransactionListScreen(
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { dismissValue ->
                                 if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
-                                    viewModel.onEvent(TransactionListUiEvent.OnDeleteTransaction(currentItem))
-                                    true
+                                    recordToDelete = DeleteRecordTarget.Transaction(currentItem)
+                                    false
                                 } else false
                             },
                             positionalThreshold = { totalDistance -> totalDistance * 0.55f }

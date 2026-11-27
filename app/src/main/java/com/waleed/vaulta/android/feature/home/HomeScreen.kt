@@ -129,6 +129,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     var showSplitBillDialog by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
     var actionMenuItem by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var pendingDeleteExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
 
     actionMenuItem?.let { item ->
         TransactionActionMenuBottomSheet(
@@ -138,7 +139,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 actionMenuItem = null
             },
             onDelete = {
-                viewModel.deleteExpense(item)
+                pendingDeleteExpense = item
                 actionMenuItem = null
             },
             onDismiss = { actionMenuItem = null }
@@ -149,6 +150,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
         AddCreditOweDialog(
             onDismiss = { showAddCreditOweDialog = false },
             onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
+            onSearchUsers = { query -> viewModel.searchVaultaUsers(query) },
             onSave = { personName, amount, type, note, contact, counterpartyId ->
                 viewModel.saveCreditOwe(personName, amount, type, note, contact, counterpartyId)
                 showAddCreditOweDialog = false
@@ -165,6 +167,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
             currentUserName = userName,
             currentUserContact = userContact,
             onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
+            onSearchUsers = { query -> viewModel.searchVaultaUsers(query) },
             onDismiss = { showSplitBillDialog = false },
             onSaveSplits = { splits ->
                 viewModel.insertSharedSplits(splits)
@@ -178,8 +181,55 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
         TransactionReceiptDialog(
             item = item,
             onEdit = { viewModel.updateExpense(it) },
-            onDelete = { viewModel.deleteExpense(it) },
+            onDelete = {
+                pendingDeleteExpense = it
+                selectedItemForReceipt = null
+            },
             onDismiss = { selectedItemForReceipt = null }
+        )
+    }
+
+    if (pendingDeleteExpense != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteExpense = null },
+            title = {
+                Text(
+                    text = "Delete Record?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Red
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete this record?",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingDeleteExpense?.let { viewModel.deleteExpense(it) }
+                        pendingDeleteExpense = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeleteExpense = null }
+                ) {
+                    Text(text = "Cancel", color = LightGrey)
+                }
+            }
         )
     }
 
@@ -722,7 +772,7 @@ fun TransactionList(
                 confirmValueChange = { dismissValue ->
                     if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
                         onDeleteClicked?.invoke(currentItem)
-                        true
+                        false
                     } else false
                 },
                 positionalThreshold = { totalDistance -> totalDistance * 0.55f }

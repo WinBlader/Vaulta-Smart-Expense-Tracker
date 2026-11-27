@@ -322,8 +322,38 @@ object TransactionNotificationParser {
         val rawMerchant = extractMerchant(title, fullBody, packageName)
         val category = mapCategory(rawMerchant, combinedText, type)
 
-        val displayTitle = rawMerchant?.ifBlank { null }
-            ?: (if (type == "Income") "Income" else "Expense")
+        val appNames = listOf(
+            "google pay", "phonepe", "paytm", "bhim", "paypal", "venmo", "cash app",
+            "zelle", "revolut", "wise", "monzo", "apple pay", "wallet", "messages", "sms",
+            "message", "messaging"
+        )
+        val titleIsAppName = appNames.any { title.contains(it, ignoreCase = true) }
+
+        val displayTitle = if (!rawMerchant.isNullOrBlank()) {
+            if (type == "Expense") {
+                if (rawMerchant.startsWith("Paid to", ignoreCase = true) || rawMerchant.startsWith("Paid at", ignoreCase = true)) {
+                    rawMerchant
+                } else {
+                    "Paid to $rawMerchant"
+                }
+            } else {
+                if (rawMerchant.startsWith("Received from", ignoreCase = true)) {
+                    rawMerchant
+                } else {
+                    "Received from $rawMerchant"
+                }
+            }
+        } else {
+            val fallbackBank = if (!titleIsAppName && title.isNotBlank() && title.length in 2..30) {
+                cleanMerchantName(title).ifBlank { null }
+            } else null
+
+            if (fallbackBank != null) {
+                if (type == "Expense") "Paid via $fallbackBank" else "Received via $fallbackBank"
+            } else {
+                if (type == "Expense") "Paid via Bank/UPI" else "Received via Bank/UPI"
+            }
+        }
 
         return ParsedTransaction(
             title = displayTitle,
@@ -401,20 +431,30 @@ object TransactionNotificationParser {
         val titleIsAppName = appNames.any { title.contains(it, ignoreCase = true) }
 
         val candidatePatterns = listOf(
+            // "to VPA: <upi_id>" or "to VPA <upi_id>"
+            Regex("""(?i)\b(?:to|at)\s+(?:vpa\s*:?\s*)([A-Za-z0-9\.\-_@]+)"""),
+            // "from VPA: <upi_id>" or "from VPA <upi_id>"
+            Regex("""(?i)\b(?:from|by)\s+(?:vpa\s*:?\s*)([A-Za-z0-9\.\-_@]+)"""),
+            // "VPA <upi_id>"
+            Regex("""(?i)\bvpa\s*:?\s*([A-Za-z0-9\.\-_@]+)"""),
             // "<Sender> (has) paid / sent you" e.g. "AJAZ Ahmad WANI paid you 101.00" or "Ajaz sent you ₹101"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:paid|sent)\s+you\b"""),
-            // "received / credited ... (by transfer) from <Sender>" e.g. "credited to your account XX1234 by transfer from AJAZ Ahmad WANI"
-            Regex("""(?i)\b(?:received|credited|deposit|deposited)\s+(?:.*?\s+)?(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
-            // "paid ... to/at <Merchant>" / "sent ... to <Merchant>" / "payment of ... to <Merchant>"
-            Regex("""(?i)\b(?:paid|sent|spent|payment|transfer|transferred)\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "sent ... to <Recipient>" e.g. "sent Rs.500 to Rahul Sharma"
+            Regex("""(?i)\bsent\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?to\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "paid ... to/at <Merchant>" e.g. "paid ₹250 to Swiggy"
+            Regex("""(?i)\bpaid\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "received ... from <Sender>" e.g. "received Rs.1,000 from Amit Kumar"
+            Regex("""(?i)\breceived\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?from\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "credited ... from (VPA) <Sender>" e.g. "credited ... from VPA abc@ybl"
+            Regex("""(?i)\bcredited\s+.*?(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)(?:vpa\s*:?\s*)?([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            // "debited ... to (VPA) <Recipient>" e.g. "debited ... to VPA xyz@okicici"
+            Regex("""(?i)\bdebited\s+.*?(?:to|towards)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)(?:vpa\s*:?\s*)?([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "to/at <Merchant>"
-            Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "(by transfer) from <Sender>"
-            Regex("""(?i)\b(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\b(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "Info: <Merchant>" e.g. Info: UPI/Uber or Info: Amazon Retail
             Regex("""(?i)\b(?:info:?|ref:?)\s*([A-Za-z0-9\s&'’\.\-_/]+?)(?:\s*\.|\s+Total|\s+Avl|\s+Bal|$)"""),
-            // "VPA <upi_id>"
-            Regex("""(?i)\b(?:vpa)\s+([A-Za-z0-9\.\-_@]+)"""),
             // "<Sender> has sent / transferred / credited to you or account"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:sent|transferred|credited)\s+(?:to\s+you|in|into|to)\s+(?:your\s+)?([A-Za-z0-9\s]+?)(?:account|a/c|\.|$)"""),
             // "<Sender> deposited in your <Bank> account"
@@ -505,11 +545,15 @@ object TransactionNotificationParser {
             .split(" ")
             .filter { it.isNotBlank() }
             .joinToString(" ") { word ->
-                val upperWord = word.uppercase(Locale.US)
-                if (acronyms.contains(upperWord) || (word.length <= 4 && word.all { it.isLetter() } && word.all { it.isUpperCase() })) {
-                    upperWord
+                if (word.contains("@")) {
+                    word.lowercase(Locale.US)
                 } else {
-                    word.lowercase(Locale.US).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                    val upperWord = word.uppercase(Locale.US)
+                    if (acronyms.contains(upperWord) || (word.length <= 4 && word.all { it.isLetter() } && word.all { it.isUpperCase() })) {
+                        upperWord
+                    } else {
+                        word.lowercase(Locale.US).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                    }
                 }
             }
     }

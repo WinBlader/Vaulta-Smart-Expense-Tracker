@@ -61,13 +61,14 @@ You maintain complete ownership of your data:
 - **Transaction Editing & Modification:** You can edit and update any logged transaction (including title, amount, type, and date) at any time directly in the app. Edits persist immediately to your local database and sync securely to your account.
 - **Individual Transaction Deletion:** You can delete any individual expense or income entry at any time via Swipe-to-Delete on the Home or Transaction List screens, or via the Delete button inside the Transaction Receipt dialog. A brief "Undo" action allows instant recovery if dismissed by mistake.
 - **In-App Data Reset ("Reset Everything"):** You can instantly erase all stored transactions, reset monthly budget thresholds to zero, and purge auto-detection configurations directly in the application under `Profile > Data & Privacy > Reset Everything`. When signed in, this also permanently purges all remote transactions from the secure backend and resets your cloud monthly budget to `0.0`.
+- **Direct In-App Account & Data Deletion:** You can permanently delete your entire account, cloud backups, profile information, shared splits, and all recorded transactions at any time directly within the app under `Profile > Delete Account & All Data`. Confirming this action immediately and irreversibly wipes all local device data (Room database, session, and preferences) and purges all remote records from our secure backend. In Guest Mode, tapping `Clear Local Data` wipes all on-device records instantly.
 - **Operating System Deletion:** You can erase all locally stored data at any time by clearing the application's storage in your Android device's Settings (`Settings > Apps > Vaulta > Storage > Clear Data`) or by uninstalling the application.
-- **Account & Cloud Data Deletion:** To request the permanent deletion of your cloud account and associated profile data from our servers, send an email to **winblader.org@gmail.com** with the subject *"Account Deletion Request"*. Your account and data will be permanently removed within 30 days.
+- **Account & Cloud Data Deletion (Secondary Contact):** Alternatively, you may also request the permanent deletion of your cloud account and associated data by emailing **winblader.org@gmail.com** with the subject *"Account Deletion Request"*.
 
 ---
 
 ## 5. Children's Privacy
-Vaulta is not directed to individuals under the age of 13. We do not knowingly collect personal information from children under 13.
+Vaulta is designed for individuals aged 13 and older and does not collect, store, or process personal information from children under 13.
 
 ---
 

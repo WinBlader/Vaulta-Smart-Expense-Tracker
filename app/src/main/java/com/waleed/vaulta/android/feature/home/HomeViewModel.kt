@@ -132,6 +132,10 @@ class HomeViewModel @Inject constructor(
         return expenseRepository.lookupVaultaContact(query)
     }
 
+    suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> {
+        return expenseRepository.searchVaultaUsers(query)
+    }
+
     fun settleSharedSplit(id: String) {
         viewModelScope.launch {
             val success = expenseRepository.settleSharedSplit(id)

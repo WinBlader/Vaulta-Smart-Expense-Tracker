@@ -57,6 +57,7 @@ interface AuthRepository {
 
     suspend fun resetPasswordForEmail(email: String): Result<String>
     suspend fun signOut(): Result<Unit>
+    suspend fun deleteOwnAccount(): Result<Unit>
 
     suspend fun signInWithGoogleAccount(
         email: String,
@@ -326,6 +327,16 @@ class AuthRepositoryImpl @Inject constructor(
                     android.util.Log.w("AuthRepository", "Notice updating privacy policy in Supabase: ${e.message}")
                 }
             }
+        }
+    }
+
+    override suspend fun deleteOwnAccount(): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            supabaseAuthService.deleteOwnAccount()
+            sessionManager.wipeAllUserData()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

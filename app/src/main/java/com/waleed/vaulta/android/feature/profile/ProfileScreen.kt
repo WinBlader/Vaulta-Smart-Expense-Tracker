@@ -72,10 +72,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -97,6 +100,7 @@ fun ProfileScreen(
     val isNotificationAccessGranted by viewModel.isNotificationAccessGranted.collectAsState()
     val isServiceConnected by viewModel.isServiceConnected.collectAsState()
     val isIgnoringBatteryOptimizations by viewModel.isIgnoringBatteryOptimizations.collectAsState()
+    val isSearchable by viewModel.isSearchable.collectAsState()
     var showCurrencyDialog by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -506,6 +510,48 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissResetEverything) }) {
+                    ExpenseTextView(text = "Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
+    if (uiState.showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(ProfileUiEvent.OnDismissDeleteAccount) },
+            title = {
+                ExpenseTextView(
+                    text = "Delete Account & Data?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Red
+                )
+            },
+            text = {
+                ExpenseTextView(
+                    text = "Are you sure you want to permanently delete your account, cloud backups, transactions, splits, and profile? This action cannot be undone.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 18.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnConfirmDeleteAccount) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    ExpenseTextView(
+                        text = "Delete Permanently",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnDismissDeleteAccount) }
+                ) {
                     ExpenseTextView(text = "Cancel", color = LightGrey)
                 }
             }
@@ -1135,7 +1181,43 @@ fun ProfileScreen(
                             color = LightGrey,
                             letterSpacing = 1.sp
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Discoverability Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                ExpenseTextView(
+                                    text = "Allow friends to find me by name",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                ExpenseTextView(
+                                    text = "Enables your profile to appear in Split Bill and Credit/Owe friend search.",
+                                    fontSize = 12.5.sp,
+                                    color = LightGrey,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Switch(
+                                checked = isSearchable,
+                                onCheckedChange = { viewModel.toggleSearchable(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Zinc
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                        Spacer(modifier = Modifier.height(14.dp))
+
                         ExpenseTextView(
                             text = "Reset all stored transactions, budgets, and configurations.",
                             fontSize = 14.sp,
@@ -1201,6 +1283,40 @@ fun ProfileScreen(
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp
+                        )
+                    }
+                }
+
+                val isGuest = user?.authProvider?.contains("Guest", ignoreCase = true) == true || user == null
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Clear, Red-Accented Delete Account & All Data Button
+                OutlinedButton(
+                    onClick = { viewModel.onEvent(ProfileUiEvent.OnRequestDeleteAccount) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Red),
+                    border = BorderStroke(1.5.dp, Red.copy(alpha = 0.8f))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_delete),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            colorFilter = ColorFilter.tint(Red)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        ExpenseTextView(
+                            text = if (isGuest) "Clear Local Data" else "Delete Account & All Data",
+                            color = Red,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
                         )
                     }
                 }

@@ -77,6 +77,8 @@ class AutoDetectTransactionIntegrationTest {
         override suspend fun syncSharedSplits() {}
         override suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult =
             com.waleed.vaulta.android.data.model.ContactLookupResult(false)
+        override suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> = emptyList()
+        override suspend fun setIsSearchable(isSearchable: Boolean): Boolean = true
 
         private val creditOweFlow = MutableStateFlow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>>(emptyList())
         override fun getAllCreditOwe(): Flow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>> = creditOweFlow
@@ -196,5 +198,63 @@ class AutoDetectTransactionIntegrationTest {
         assertEquals("Income", updated.first().type)
         assertEquals(101.0, updated.first().amount, 0.01)
         assertTrue(updated.first().title.contains("AJAZ Ahmad WANI", ignoreCase = true))
+    }
+
+    @Test
+    fun testUpiCounterpartyExtractionPatterns() {
+        // 1. Sent to Person
+        val p1 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Axis Bank",
+            text = "You sent Rs.500 to Rahul Sharma on 24-Nov-26. Ref: 12345"
+        )
+        assertNotNull(p1)
+        assertEquals("Expense", p1!!.type)
+        assertEquals(500.0, p1.amount, 0.01)
+        assertEquals("Paid to Rahul Sharma", p1.title)
+
+        // 2. Paid to Merchant
+        val p2 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "HDFC Bank",
+            text = "You paid ₹250 to Swiggy on 24-Nov-26. Avl bal: Rs 5,000"
+        )
+        assertNotNull(p2)
+        assertEquals("Expense", p2!!.type)
+        assertEquals(250.0, p2.amount, 0.01)
+        assertEquals("Paid to Swiggy", p2.title)
+
+        // 3. Debited to VPA
+        val p3 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "ICICI Bank",
+            text = "Your a/c XX123 is debited for INR 150.00 to VPA xyz@okicici on 24-Nov-26"
+        )
+        assertNotNull(p3)
+        assertEquals("Expense", p3!!.type)
+        assertEquals(150.0, p3.amount, 0.01)
+        assertEquals("Paid to xyz@okicici", p3.title)
+
+        // 4. Received from Person
+        val p4 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "SBI",
+            text = "You received Rs.1,000 from Amit Kumar on 24-Nov-26. Avl bal: Rs 10,000"
+        )
+        assertNotNull(p4)
+        assertEquals("Income", p4!!.type)
+        assertEquals(1000.0, p4.amount, 0.01)
+        assertEquals("Received from Amit Kumar", p4.title)
+
+        // 5. Credited from VPA
+        val p5 = TransactionNotificationParser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Paytm",
+            text = "Your account is credited with Rs 300.00 from VPA abc@ybl on 24-Nov-26"
+        )
+        assertNotNull(p5)
+        assertEquals("Income", p5!!.type)
+        assertEquals(300.0, p5.amount, 0.01)
+        assertEquals("Received from abc@ybl", p5.title)
     }
 }
