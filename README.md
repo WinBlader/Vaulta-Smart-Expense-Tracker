@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.0%20(Build%2018)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.0"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.0%20(Build%2019)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.0"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
