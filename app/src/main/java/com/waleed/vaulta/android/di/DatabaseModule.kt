@@ -36,4 +36,9 @@ object DatabaseModule {
     fun provideUserBalanceDao(database: ExpenseDatabase): UserBalanceDao {
         return database.userBalanceDao()
     }
+
+    @Provides
+    fun provideCreditOweDao(database: ExpenseDatabase): com.waleed.vaulta.android.data.dao.CreditOweDao {
+        return database.creditOweDao()
+    }
 }

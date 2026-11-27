@@ -17,9 +17,15 @@ import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
@@ -35,11 +41,13 @@ class HomeViewModel @Inject constructor(
     val monthlyBudget: StateFlow<Double> = budgetRepository.monthlyBudget
     val initialBalance: StateFlow<Double> = sessionManager.initialBalance
 
-    fun insertSharedSplits(splits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>, creatorExpense: ExpenseEntity?) {
+    val userBalance: StateFlow<com.waleed.vaulta.android.data.model.UserBalanceEntity?> = sessionManager.currentUser.flatMapLatest { user ->
+        val userKey = sessionManager.getCurrentUserKey()
+        expenseRepository.observeUserBalance(userKey)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun insertSharedSplits(splits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>) {
         viewModelScope.launch {
-            if (creatorExpense != null) {
-                expenseRepository.insertExpense(creatorExpense)
-            }
             val success = expenseRepository.insertSharedSplits(splits)
             if (success) {
                 com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
@@ -50,37 +58,73 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun saveCreditOwe(expense: ExpenseEntity, counterpartyContact: String?, counterpartyId: String? = null) {
+    fun saveCreditOwe(
+        personName: String,
+        amount: Double,
+        type: String, // "CREDIT" or "OWE"
+        note: String?,
+        counterpartyContact: String?,
+        counterpartyId: String? = null
+    ) {
         viewModelScope.launch {
-            val success = expenseRepository.insertExpense(expense)
+            val userKey = sessionManager.getCurrentUserKey()
+            val entry = com.waleed.vaulta.android.data.model.CreditOweEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                userId = userKey,
+                counterpartyId = counterpartyId,
+                personName = personName.trim(),
+                counterpartyContact = counterpartyContact?.trim()?.ifBlank { null },
+                type = type,
+                amount = amount,
+                note = note?.trim()?.ifBlank { null },
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+            val success = expenseRepository.insertCreditOwe(entry)
             if (success) {
-                if (!counterpartyContact.isNullOrBlank()) {
-                    val userKey = sessionManager.getCurrentUserKey()
-                    val currentUser = user.value
-                    val isOwedToUser = expense.type.equals("Owed to You", ignoreCase = true)
-                    val splitEntity = com.waleed.vaulta.android.data.model.SharedSplitEntity(
-                        id = if (expense.uuid.isNotBlank()) expense.uuid else java.util.UUID.randomUUID().toString(),
-                        title = expense.title,
-                        totalAmount = expense.amount,
-                        splitAmount = expense.amount,
-                        creatorId = userKey,
-                        creatorName = currentUser?.name?.ifBlank { "Vaulta User" } ?: "Vaulta User",
-                        creatorContact = currentUser?.email?.ifBlank { currentUser.phoneNumber },
-                        counterpartyId = counterpartyId,
-                        counterpartyName = expense.title,
-                        counterpartyContact = counterpartyContact,
-                        direction = if (isOwedToUser) "OWED_TO_CREATOR" else "CREATOR_OWES",
-                        status = "PENDING",
-                        timestamp = Utils.getMillisFromDate(expense.date),
-                        notes = expense.note
-                    )
-                    expenseRepository.insertSharedSplit(splitEntity)
-                }
                 com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
                     message = "Credit/Owe record saved",
                     durationMs = 3000L
                 )
             }
+        }
+    }
+
+    fun settleCreditOwe(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.settleCreditOwe(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Credit/Owe obligation settled",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun deleteCreditOwe(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.deleteCreditOwe(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Credit/Owe record deleted",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun settleAllInSplitGroup(groupId: String) {
+        viewModelScope.launch {
+            val allSplits = expenseRepository.getAllSharedSplits().first()
+            val groupSplits = allSplits.filter { (it.groupId == groupId) && it.status.equals("PENDING", ignoreCase = true) }
+            for (split in groupSplits) {
+                expenseRepository.settleSharedSplit(split.id)
+            }
+            com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                message = "All splits in group settled",
+                durationMs = 3000L
+            )
         }
     }
 
@@ -216,7 +260,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun getTotalBalanceAmount(list: List<ExpenseEntity>): Double {
-        return sessionManager.getInitialBalance() + getRawTransactionNet(list)
+        return userBalance.value?.currentBalance ?: (sessionManager.getInitialBalance() + getRawTransactionNet(list))
     }
 
     fun getBalance(list: List<ExpenseEntity>, currency: CurrencyItem = CurrencyManager.getSelectedCurrency()): String {

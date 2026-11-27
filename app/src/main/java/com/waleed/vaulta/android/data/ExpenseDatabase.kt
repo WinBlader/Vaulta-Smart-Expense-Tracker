@@ -7,21 +7,24 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.waleed.vaulta.android.data.dao.ExpenseDao
+import com.waleed.vaulta.android.data.dao.CreditOweDao
 import com.waleed.vaulta.android.data.dao.SharedSplitDao
 import com.waleed.vaulta.android.data.dao.UserBalanceDao
+import com.waleed.vaulta.android.data.model.CreditOweEntity
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.SharedSplitEntity
 import com.waleed.vaulta.android.data.model.UserBalanceEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
-@Database(entities = [ExpenseEntity::class, SharedSplitEntity::class, UserBalanceEntity::class], version = 7, exportSchema = false)
+@Database(entities = [ExpenseEntity::class, SharedSplitEntity::class, UserBalanceEntity::class, CreditOweEntity::class], version = 8, exportSchema = false)
 @Singleton
 abstract class ExpenseDatabase : RoomDatabase() {
 
     abstract fun expenseDao(): ExpenseDao
     abstract fun sharedSplitDao(): SharedSplitDao
     abstract fun userBalanceDao(): UserBalanceDao
+    abstract fun creditOweDao(): CreditOweDao
 
     companion object {
         const val DATABASE_NAME = "expense_database"
@@ -36,7 +39,7 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     ExpenseDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance
@@ -131,5 +134,29 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
             )
             """.trimIndent()
         )
+    }
+}
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS credit_owe (
+                id TEXT NOT NULL PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                counterparty_id TEXT,
+                person_name TEXT NOT NULL,
+                counterparty_contact TEXT,
+                type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                note TEXT,
+                status TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                settled_at INTEGER
+            )
+            """.trimIndent()
+        )
+        // Clean up legacy split bill creator expenses or credit/owe entries if any
+        database.execSQL("DELETE FROM expense_table WHERE type IN ('Credit', 'Owe', 'CREDIT', 'OWE') OR note LIKE 'Split bill:%' OR title LIKE '%(My Share)'")
     }
 }

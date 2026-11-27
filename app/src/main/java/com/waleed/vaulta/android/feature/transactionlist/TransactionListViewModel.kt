@@ -30,6 +30,7 @@ data class TransactionListUiState(
     val transactions: List<ExpenseEntity> = emptyList(),
     val allTransactions: List<ExpenseEntity> = emptyList(),
     val sharedSplits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity> = emptyList(),
+    val creditOweList: List<com.waleed.vaulta.android.data.model.CreditOweEntity> = emptyList(),
     val searchQuery: String = "",
     val filterType: String = "All", // "All", "Expense", "Income", "Credit / Owe", "Shared Splits"
     val selectedCategory: String = "All", // "All" or specific category
@@ -56,8 +57,9 @@ class TransactionListViewModel @Inject constructor(
     val uiState: StateFlow<TransactionListUiState> = combine(
         expenseRepository.getAllExpenses(),
         expenseRepository.getAllSharedSplits(),
+        expenseRepository.getAllCreditOwe(),
         _filterParams
-    ) { allExpenses, allSplits, filters ->
+    ) { allExpenses, allSplits, allCreditOwe, filters ->
 
         // 1. Search Query Filter
         val queryFiltered = if (filters.query.isBlank()) {
@@ -130,10 +132,22 @@ class TransactionListViewModel @Inject constructor(
             }
         }
 
+        val filteredCreditOwe = if (filters.query.isBlank()) {
+            allCreditOwe
+        } else {
+            val q = filters.query.trim().lowercase()
+            allCreditOwe.filter { co ->
+                co.personName.lowercase().contains(q) ||
+                co.amount.toString().contains(q) ||
+                (co.note?.lowercase()?.contains(q) == true)
+            }
+        }
+
         TransactionListUiState(
             transactions = dateFiltered,
             allTransactions = allExpenses,
             sharedSplits = filteredSplits,
+            creditOweList = filteredCreditOwe,
             searchQuery = filters.query,
             filterType = filters.type,
             selectedCategory = filters.category,
@@ -225,12 +239,60 @@ class TransactionListViewModel @Inject constructor(
         }
     }
 
+    fun settleAllInSplitGroup(groupId: String) {
+        viewModelScope.launch {
+            val allSplits = uiState.value.sharedSplits
+            val groupSplits = allSplits.filter { (it.groupId == groupId) && it.status.equals("PENDING", ignoreCase = true) }
+            for (split in groupSplits) {
+                expenseRepository.settleSharedSplit(split.id)
+            }
+            com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                message = "All splits in group settled",
+                durationMs = 3000L
+            )
+        }
+    }
+
     fun deleteSharedSplit(id: String) {
         viewModelScope.launch {
             val success = expenseRepository.deleteSharedSplit(id)
             if (success) {
                 com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
                     message = "Split deleted",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun settleCreditOwe(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.settleCreditOwe(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Credit/Owe marked as settled",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity) {
+        viewModelScope.launch {
+            expenseRepository.updateCreditOwe(entry)
+            com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                message = "Credit/Owe updated",
+                durationMs = 3000L
+            )
+        }
+    }
+
+    fun deleteCreditOwe(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.deleteCreditOwe(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Credit/Owe record deleted",
                     durationMs = 3000L
                 )
             }

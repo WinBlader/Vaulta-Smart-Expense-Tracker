@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.1%20(Build%2020)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.1"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.2%20(Build%2021)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.2"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -42,20 +42,22 @@
 
 ## ✨ Key Features 
 
-### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Live Contact Lookup (v1.5.1)
+### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Dedicated Credit/Owe (v1.5.2)
 - **Fast Transaction Logging:** Dedicated, distraction-free entry layouts optimized separately for income streams, expenses, and Credit/Owe obligations.
+- **Dedicated Credit & Owe Ledger (v1.5.2):** Credit and Owe obligations are stored in a dedicated `credit_owe` database table, completely separating them from personal expenses. Your daily spending, monthly budget calculations, and income charts remain 100% clean and unpolluted.
 - **Split Bill (Splitwise-Style Group Splitter):** Dedicated Indigo FAB action allowing you to split group bills (e.g., dinners, shared trips, apartment rent) between multiple participants.
   - Supports **Equal Split** (automatic even distribution among all participants) and **Custom Split** (per-person custom amounts with live total validation).
-  - **Include My Share in Bill:** Toggle whether the creator's personal portion is logged as a personal Expense while other shares are tracked as obligations owed to you.
-  - **Participant Management:** Add multiple members with required Name and optional Email/Phone for universal cross-account sync without requiring device Contacts permissions.
-- **Live Vaulta Contact Lookup (v1.5.1):** When adding participants in Split Bill or Credit & Owe, entering an email or mobile number triggers a debounced live search against registered Vaulta accounts. If a registered user is found, a verified match badge (`Vaulta user found: {Name} ✓`) is displayed, their name is auto-filled if blank, and the obligation is bound directly to their user ID.
-- **Retroactive Profile Contact Linking (v1.5.1):** Adding or updating your phone number or email address in your Profile immediately triggers background auto-linking for all past or pending splits and Credit/Owe obligations assigned to that contact identifier.
+  - Clean separation: Split bill shares are tracked exclusively within `shared_splits` without creating redundant fake personal expense records.
+  - **Participant Management & Contact Picker (v1.5.2):** Enter participants manually or tap **Pick Contact** to select directly from your device address book with smooth runtime permissions.
+- **Group & Individual Settle Up (v1.5.2):** In the Transaction List screen, group splits display a **Settle All** button for closing the entire bill in one click, alongside individual participant **Settle** actions. Bilateral Credit / Owe cards include one-tap settlement and edit/delete controls.
+- **Live Vaulta Contact Lookup:** When adding participants in Split Bill or Credit & Owe, entering an email or mobile number triggers a debounced live search against registered Vaulta accounts. If a registered user is found, a verified match badge (`Vaulta user found: {Name} ✓`) is displayed, their name is auto-filled if blank, and the obligation is bound directly to their user ID.
+- **Retroactive Profile Contact Linking:** Adding or updating your phone number or email address in your Profile immediately triggers background auto-linking for all past or pending splits and Credit/Owe obligations assigned to that contact identifier.
 - **Universal Shared Credit/Owe Ledger:**
-  - View cross-account shared splits and bilateral Credit/Owe obligations in the full Transaction List screen under the **Shared Splits** filter chip.
+  - View cross-account shared splits and bilateral Credit/Owe obligations in the full Transaction List screen under the **Shared Splits** or **Credit / Owe** filter chips.
   - **Perspective-Aware Rendering:** Dynamically detects whether you created the split or are a participant (via contact matching), cleanly indicating who owes whom (e.g., *"Alex owes you"* vs *"You owe Sarah"*).
   - **Sync & Settlement Status Chips:** Displays real-time status chips for `"Synced"` (cloud-backed) / `"Local"` and `"Pending"` / `"Settled"`.
   - **Settle Up Action:** Mark obligations as settled with one tap, instantly updating locally and across Supabase cloud.
-- **Credit & Owe FAB Action:** Expandable FAB features a vibrant Amber/Yellow action allowing you to log whether someone owes you money (Credit / Balance `+`) or you owe someone (Owe / Balance `-`) with optional contact details for cross-device cloud sync.
+- **Credit & Owe FAB Action:** Expandable FAB features a vibrant Amber/Yellow action allowing you to log whether someone owes you money (Credit / Balance `+`) or you owe someone (Owe / Balance `-`) with optional contact picker and cross-device cloud sync.
 - **Optional Transaction Notes:** Add optional descriptive notes to any transaction during creation, edit existing transactions with notes, and view notes in receipts and transaction histories.
 - **Custom Notes & Titles:** Tap the ✏️ pencil tool to record custom merchant or project titles (e.g., *"Freelance Retainer"*, *"Farmers Market"*) while retaining primary category tags.
 - **Rich Category Presets:**

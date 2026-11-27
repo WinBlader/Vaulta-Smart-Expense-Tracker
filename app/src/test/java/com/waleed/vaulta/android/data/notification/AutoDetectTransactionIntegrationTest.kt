@@ -77,6 +77,14 @@ class AutoDetectTransactionIntegrationTest {
         override suspend fun syncSharedSplits() {}
         override suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult =
             com.waleed.vaulta.android.data.model.ContactLookupResult(false)
+
+        private val creditOweFlow = MutableStateFlow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>>(emptyList())
+        override fun getAllCreditOwe(): Flow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>> = creditOweFlow
+        override suspend fun insertCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean = true
+        override suspend fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean = true
+        override suspend fun settleCreditOwe(id: String): Boolean = true
+        override suspend fun deleteCreditOwe(id: String): Boolean = true
+        override suspend fun syncCreditOwe() {}
     }
 
     @Test

@@ -34,6 +34,13 @@ import com.waleed.vaulta.android.data.model.SharedSplitEntity
 import com.waleed.vaulta.android.utils.Utils
 import java.util.UUID
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.waleed.vaulta.android.widget.ContactPickerBottomSheet
+
 data class SplitParticipant(
     val name: String = "",
     val contact: String = "",
@@ -50,7 +57,7 @@ fun SplitBillDialog(
     currentUserContact: String,
     onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
     onDismiss: () -> Unit,
-    onSaveSplits: (List<SharedSplitEntity>, ExpenseEntity?) -> Unit
+    onSaveSplits: (List<SharedSplitEntity>) -> Unit
 ) {
     val context = LocalContext.current
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
@@ -61,9 +68,38 @@ fun SplitBillDialog(
     var includeCreator by remember { mutableStateOf(true) }
     var notes by remember { mutableStateOf("") }
 
+    var showContactPicker by remember { mutableStateOf(false) }
+    var activeContactPickerIndex by remember { mutableStateOf(0) }
+
     // List of other participants
     var participants by remember {
         mutableStateOf(listOf(SplitParticipant(), SplitParticipant()))
+    }
+
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showContactPicker = true
+        } else {
+            Toast.makeText(context, "Contacts permission allows picking friends easily. You can still type manually.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    if (showContactPicker) {
+        ContactPickerBottomSheet(
+            onDismiss = { showContactPicker = false },
+            onContactSelected = { cName, cContact ->
+                participants = participants.toMutableList().also { list ->
+                    if (activeContactPickerIndex < list.size) {
+                        list[activeContactPickerIndex] = list[activeContactPickerIndex].copy(
+                            name = cName,
+                            contact = cContact
+                        )
+                    }
+                }
+            }
+        )
     }
 
     val totalAmount = totalAmountInput.toDoubleOrNull() ?: 0.0
@@ -359,6 +395,23 @@ fun SplitBillDialog(
                                     },
                                     label = { Text("Email or Phone (Optional for Sync)") },
                                     placeholder = { Text("bob@example.com or +1234567890") },
+                                    trailingIcon = {
+                                        IconButton(onClick = {
+                                            activeContactPickerIndex = index
+                                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                                                showContactPicker = true
+                                            } else {
+                                                contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                                            }
+                                        }) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.ic_profile),
+                                                contentDescription = "Pick Contact",
+                                                tint = Color(0xFF6366F1),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(8.dp)
@@ -516,22 +569,7 @@ fun SplitBillDialog(
                                     )
                                 }
 
-                                val creatorExpense = if (includeCreator) {
-                                    val creatorShare = if (isEqualSplit) equalSharePerPerson else creatorCustomShare
-                                    if (creatorShare > 0) {
-                                        ExpenseEntity(
-                                            id = null,
-                                            title = "${title.trim()} (My Share)",
-                                            amount = creatorShare,
-                                            date = Utils.formatDateToHumanReadableForm(now),
-                                            type = "Expense",
-                                            userId = currentUserId,
-                                            note = "Split bill: ${title.trim()}"
-                                        )
-                                    } else null
-                                } else null
-
-                                onSaveSplits(splitEntities, creatorExpense)
+                                onSaveSplits(splitEntities)
                             }
                         },
                         enabled = isValid,

@@ -1,7 +1,12 @@
 package com.waleed.vaulta.android.feature.home
 
+import android.Manifest
 import android.app.DatePickerDialog
+import android.content.pm.PackageManager
 import android.widget.DatePicker
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,31 +25,61 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import com.waleed.vaulta.android.R
 import com.waleed.vaulta.android.data.CurrencyManager
-import com.waleed.vaulta.android.data.model.ExpenseEntity
+import com.waleed.vaulta.android.data.model.CreditOweEntity
 import com.waleed.vaulta.android.utils.Utils
+import com.waleed.vaulta.android.widget.ContactPickerBottomSheet
 import java.util.Calendar
 
 @Composable
 fun AddCreditOweDialog(
+    initialEntity: CreditOweEntity? = null,
     onDismiss: () -> Unit,
     onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
-    onSave: (ExpenseEntity, String?, String?) -> Unit
+    onSettle: (() -> Unit)? = null,
+    onSave: (personName: String, amount: Double, type: String, note: String?, contact: String?, counterpartyId: String?) -> Unit
 ) {
     val context = LocalContext.current
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
 
-    // Direction: true = Someone Owes You (Credit/Income), false = You Owe Someone (Debit/Debt)
-    var isSomeoneOwesYou by remember { mutableStateOf(true) }
-    var personName by remember { mutableStateOf("") }
-    var personContact by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(System.currentTimeMillis()) }
-    var note by remember { mutableStateOf("") }
-    var counterpartyId by remember { mutableStateOf<String?>(null) }
+    // Direction: true = Someone Owes You (CREDIT), false = You Owe Someone (OWE)
+    var isSomeoneOwesYou by remember {
+        mutableStateOf(initialEntity?.type?.equals("CREDIT", true) ?: true)
+    }
+    var personName by remember { mutableStateOf(initialEntity?.personName ?: "") }
+    var personContact by remember { mutableStateOf(initialEntity?.counterpartyContact ?: "") }
+    var amount by remember {
+        mutableStateOf(initialEntity?.amount?.let { if (it > 0) it.toString() else "" } ?: "")
+    }
+    var date by remember { mutableStateOf(initialEntity?.createdAt ?: System.currentTimeMillis()) }
+    var note by remember { mutableStateOf(initialEntity?.note ?: "") }
+    var counterpartyId by remember { mutableStateOf<String?>(initialEntity?.counterpartyId) }
     var lookupResult by remember { mutableStateOf<com.waleed.vaulta.android.data.model.ContactLookupResult?>(null) }
     var isLookingUp by remember { mutableStateOf(false) }
+
+    var showContactPicker by remember { mutableStateOf(false) }
+
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showContactPicker = true
+        } else {
+            Toast.makeText(context, "Contacts permission allows picking friends easily. You can still type manually.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    if (showContactPicker) {
+        ContactPickerBottomSheet(
+            onDismiss = { showContactPicker = false },
+            onContactSelected = { cName, cContact ->
+                personName = cName
+                personContact = cContact
+            }
+        )
+    }
 
     LaunchedEffect(personContact) {
         val trimmed = personContact.trim()
@@ -114,7 +149,7 @@ fun AddCreditOweDialog(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Credit & Owe",
+                        text = if (initialEntity != null) "Edit Credit & Owe" else "Credit & Owe",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -180,12 +215,28 @@ fun AddCreditOweDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Person Contact (Optional for sync)
+                // Person Contact (Optional for sync) + Pick from Contacts button
                 OutlinedTextField(
                     value = personContact,
                     onValueChange = { personContact = it },
                     label = { Text("Email or Phone (Optional for Sync)") },
                     placeholder = { Text("john@example.com or +1234567890") },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                                showContactPicker = true
+                            } else {
+                                contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_profile),
+                                contentDescription = "Pick Contact",
+                                tint = Color(0xFFF59E0B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -278,8 +329,23 @@ fun AddCreditOweDialog(
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (initialEntity != null && initialEntity.status.equals("PENDING", ignoreCase = true) && onSettle != null) {
+                        Button(
+                            onClick = {
+                                onSettle()
+                                onDismiss()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Settle Up", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+
                     TextButton(onClick = onDismiss) {
                         Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -288,16 +354,15 @@ fun AddCreditOweDialog(
                         onClick = {
                             val parsedAmount = amount.toDoubleOrNull() ?: 0.0
                             if (parsedAmount > 0 && personName.isNotBlank()) {
-                                val typeStr = if (isSomeoneOwesYou) "Owed to You" else "You Owe"
-                                val entity = ExpenseEntity(
-                                    id = null,
-                                    title = personName.trim(),
-                                    amount = parsedAmount,
-                                    date = Utils.formatDateToHumanReadableForm(date),
-                                    type = typeStr,
-                                    note = note.trim().ifBlank { null }
+                                val typeStr = if (isSomeoneOwesYou) "CREDIT" else "OWE"
+                                onSave(
+                                    personName.trim(),
+                                    parsedAmount,
+                                    typeStr,
+                                    note.trim().ifBlank { null },
+                                    personContact.trim().ifBlank { null },
+                                    counterpartyId
                                 )
-                                onSave(entity, personContact.trim().ifBlank { null }, counterpartyId)
                             }
                         },
                         enabled = personName.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0,
@@ -313,3 +378,4 @@ fun AddCreditOweDialog(
         }
     }
 }
+

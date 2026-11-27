@@ -149,8 +149,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
         AddCreditOweDialog(
             onDismiss = { showAddCreditOweDialog = false },
             onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
-            onSave = { entity, contact, counterpartyId ->
-                viewModel.saveCreditOwe(entity, contact, counterpartyId)
+            onSave = { personName, amount, type, note, contact, counterpartyId ->
+                viewModel.saveCreditOwe(personName, amount, type, note, contact, counterpartyId)
                 showAddCreditOweDialog = false
             }
         )
@@ -166,8 +166,8 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
             currentUserContact = userContact,
             onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
             onDismiss = { showSplitBillDialog = false },
-            onSaveSplits = { splits, creatorExp ->
-                viewModel.insertSharedSplits(splits, creatorExp)
+            onSaveSplits = { splits ->
+                viewModel.insertSharedSplits(splits)
                 showSplitBillDialog = false
             }
         )
