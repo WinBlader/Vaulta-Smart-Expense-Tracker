@@ -275,7 +275,16 @@ class AuthRepositoryImpl @Inject constructor(
         email: String,
         phone: String
     ): Result<Unit> {
-        return supabaseAuthService.updateUserProfileCloud(name, email, phone)
+        val res = supabaseAuthService.updateUserProfileCloud(name, email, phone)
+        if (res.isSuccess) {
+            // Trigger sync to retroactively claim/link pending splits for updated email or mobile number
+            try {
+                expenseRepository.syncSharedSplits()
+            } catch (e: Exception) {
+                android.util.Log.w("AuthRepository", "Notice syncing splits after profile update: ${e.message}")
+            }
+        }
+        return res
     }
 
     override fun updateUser(name: String, email: String, phone: String) {

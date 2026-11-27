@@ -29,7 +29,8 @@ import java.util.Calendar
 @Composable
 fun AddCreditOweDialog(
     onDismiss: () -> Unit,
-    onSave: (ExpenseEntity, String?) -> Unit
+    onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
+    onSave: (ExpenseEntity, String?, String?) -> Unit
 ) {
     val context = LocalContext.current
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
@@ -41,6 +42,32 @@ fun AddCreditOweDialog(
     var amount by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
     var note by remember { mutableStateOf("") }
+    var counterpartyId by remember { mutableStateOf<String?>(null) }
+    var lookupResult by remember { mutableStateOf<com.waleed.vaulta.android.data.model.ContactLookupResult?>(null) }
+    var isLookingUp by remember { mutableStateOf(false) }
+
+    LaunchedEffect(personContact) {
+        val trimmed = personContact.trim()
+        if (trimmed.length < 3 || onLookupContact == null) {
+            counterpartyId = null
+            lookupResult = null
+            isLookingUp = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(400)
+        isLookingUp = true
+        val res = onLookupContact(trimmed)
+        isLookingUp = false
+        lookupResult = res
+        if (res.found) {
+            counterpartyId = res.userId
+            if (personName.isBlank() && !res.displayName.isNullOrBlank()) {
+                personName = res.displayName
+            }
+        } else {
+            counterpartyId = null
+        }
+    }
 
     val calendar = Calendar.getInstance().apply { timeInMillis = date }
     val datePickerDialog = DatePickerDialog(
@@ -164,6 +191,32 @@ fun AddCreditOweDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                if (isLookingUp) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Checking Vaulta user...", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else if (lookupResult != null && personContact.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (lookupResult!!.found) {
+                        val nameToShow = lookupResult!!.displayName ?: "Vaulta user"
+                        Text(
+                            text = "Vaulta user found: $nameToShow ✓",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF10B981)
+                        )
+                    } else {
+                        Text(
+                            text = "Not registered yet — will auto-sync when they join or add this contact",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
                 // Amount Field
@@ -244,7 +297,7 @@ fun AddCreditOweDialog(
                                     type = typeStr,
                                     note = note.trim().ifBlank { null }
                                 )
-                                onSave(entity, personContact.trim().ifBlank { null })
+                                onSave(entity, personContact.trim().ifBlank { null }, counterpartyId)
                             }
                         },
                         enabled = personName.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0,

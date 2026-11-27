@@ -58,6 +58,7 @@ interface ExpenseRepository {
     suspend fun settleSharedSplit(id: String): Boolean
     suspend fun deleteSharedSplit(id: String): Boolean
     suspend fun syncSharedSplits()
+    suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -68,6 +69,7 @@ class ExpenseRepositoryImpl @Inject constructor(
     private val userBalanceDao: UserBalanceDao,
     private val budgetManager: BudgetManager,
     private val sessionManager: UserSessionManager,
+    private val supabaseAuthService: com.waleed.vaulta.android.data.auth.supabase.SupabaseAuthService,
     @ApplicationContext private val context: Context? = null
 ) : ExpenseRepository {
 
@@ -812,6 +814,10 @@ class ExpenseRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Notice syncing shared splits: ${e.message}", e)
         }
+    }
+
+    override suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult {
+        return supabaseAuthService.lookupVaultaContact(query)
     }
 
     private suspend fun pushSharedSplitToCloud(split: SharedSplitEntity) {

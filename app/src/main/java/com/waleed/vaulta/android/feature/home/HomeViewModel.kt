@@ -50,7 +50,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun saveCreditOwe(expense: ExpenseEntity, counterpartyContact: String?) {
+    fun saveCreditOwe(expense: ExpenseEntity, counterpartyContact: String?, counterpartyId: String? = null) {
         viewModelScope.launch {
             val success = expenseRepository.insertExpense(expense)
             if (success) {
@@ -66,7 +66,7 @@ class HomeViewModel @Inject constructor(
                         creatorId = userKey,
                         creatorName = currentUser?.name?.ifBlank { "Vaulta User" } ?: "Vaulta User",
                         creatorContact = currentUser?.email?.ifBlank { currentUser.phoneNumber },
-                        counterpartyId = null,
+                        counterpartyId = counterpartyId,
                         counterpartyName = expense.title,
                         counterpartyContact = counterpartyContact,
                         direction = if (isOwedToUser) "OWED_TO_CREATOR" else "CREATOR_OWES",
@@ -82,6 +82,10 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult {
+        return expenseRepository.lookupVaultaContact(query)
     }
 
     fun settleSharedSplit(id: String) {

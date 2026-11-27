@@ -1005,6 +1005,28 @@ class SupabaseAuthService @Inject constructor(
         }
     }
 
+    /**
+     * Looks up a registered Vaulta user by email or mobile number using secure RPC lookup_vaulta_contact.
+     * Returns found = false if offline, guest, or not found.
+     */
+    suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult = withContext(Dispatchers.IO) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.isBlank() || !SupabaseClientProvider.isConfigured() || !sessionManager.isLoggedIn()) {
+            return@withContext com.waleed.vaulta.android.data.model.ContactLookupResult(found = false)
+        }
+        try {
+            ensureSessionInitialized()
+            val rpcParams = buildJsonObject {
+                put("p_query", cleanQuery)
+            }
+            val result = client.postgrest.rpc("lookup_vaulta_contact", rpcParams).decodeAs<com.waleed.vaulta.android.data.model.ContactLookupResult>()
+            result
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice during contact lookup for '$cleanQuery': ${e.message}")
+            com.waleed.vaulta.android.data.model.ContactLookupResult(found = false)
+        }
+    }
+
     private fun saveToSession(user: SupabaseUser) {
         sessionManager.saveUser(
             UserProfile(

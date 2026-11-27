@@ -75,6 +75,8 @@ class AutoDetectTransactionIntegrationTest {
         override suspend fun settleSharedSplit(id: String): Boolean = true
         override suspend fun deleteSharedSplit(id: String): Boolean = true
         override suspend fun syncSharedSplits() {}
+        override suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult =
+            com.waleed.vaulta.android.data.model.ContactLookupResult(false)
     }
 
     @Test

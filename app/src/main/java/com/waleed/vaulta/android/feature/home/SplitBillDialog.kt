@@ -37,7 +37,10 @@ import java.util.UUID
 data class SplitParticipant(
     val name: String = "",
     val contact: String = "",
-    val customAmount: String = ""
+    val customAmount: String = "",
+    val counterpartyId: String? = null,
+    val lookupResult: com.waleed.vaulta.android.data.model.ContactLookupResult? = null,
+    val isLookingUp: Boolean = false
 )
 
 @Composable
@@ -45,6 +48,7 @@ fun SplitBillDialog(
     currentUserId: String,
     currentUserName: String,
     currentUserContact: String,
+    onLookupContact: (suspend (String) -> com.waleed.vaulta.android.data.model.ContactLookupResult)? = null,
     onDismiss: () -> Unit,
     onSaveSplits: (List<SharedSplitEntity>, ExpenseEntity?) -> Unit
 ) {
@@ -360,6 +364,69 @@ fun SplitBillDialog(
                                     shape = RoundedCornerShape(8.dp)
                                 )
 
+                                LaunchedEffect(participant.contact) {
+                                    val trimmed = participant.contact.trim()
+                                    if (trimmed.length < 3 || onLookupContact == null) {
+                                        if (participant.lookupResult != null || participant.counterpartyId != null || participant.isLookingUp) {
+                                            participants = participants.toMutableList().also {
+                                                if (index < it.size) {
+                                                    it[index] = it[index].copy(lookupResult = null, counterpartyId = null, isLookingUp = false)
+                                                }
+                                            }
+                                        }
+                                        return@LaunchedEffect
+                                    }
+                                    kotlinx.coroutines.delay(400)
+                                    participants = participants.toMutableList().also {
+                                        if (index < it.size) {
+                                            it[index] = it[index].copy(isLookingUp = true)
+                                        }
+                                    }
+                                    val result = onLookupContact(trimmed)
+                                    participants = participants.toMutableList().also { list ->
+                                        if (index < list.size) {
+                                            val current = list[index]
+                                            val newName = if (current.name.isBlank() && result.found && !result.displayName.isNullOrBlank()) {
+                                                result.displayName
+                                            } else {
+                                                current.name
+                                            }
+                                            list[index] = current.copy(
+                                                name = newName,
+                                                counterpartyId = if (result.found) result.userId else null,
+                                                lookupResult = result,
+                                                isLookingUp = false
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (participant.isLookingUp) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Checking Vaulta user...", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else if (participant.lookupResult != null && participant.contact.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    if (participant.lookupResult.found) {
+                                        val nameToShow = participant.lookupResult.displayName ?: "Vaulta user"
+                                        Text(
+                                            text = "Vaulta user found: $nameToShow ✓",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF10B981)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "Not registered yet — will auto-sync when they join or add this contact",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+
                                 if (isEqualSplit) {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
@@ -439,7 +506,7 @@ fun SplitBillDialog(
                                         creatorId = currentUserId,
                                         creatorName = currentUserName,
                                         creatorContact = currentUserContact.ifBlank { null },
-                                        counterpartyId = null,
+                                        counterpartyId = p.counterpartyId,
                                         counterpartyName = p.name.trim(),
                                         counterpartyContact = p.contact.trim().ifBlank { null },
                                         direction = "OWED_TO_CREATOR",
