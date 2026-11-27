@@ -14,6 +14,7 @@ data class ProfileDto(
     @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("auth_provider") val authProvider: String? = "Email",
     @SerialName("monthly_budget") val monthlyBudget: Double? = 0.0,
+    @SerialName("initial_balance") val initialBalance: Double? = 0.0,
     @SerialName("currency_code") val currencyCode: String? = "INR",
     @SerialName("privacy_policy_accepted") val privacyPolicyAccepted: Boolean? = false,
     @SerialName("created_at") val createdAt: String? = null,

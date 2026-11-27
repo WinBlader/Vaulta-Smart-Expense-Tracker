@@ -23,16 +23,26 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +54,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import com.waleed.vaulta.android.data.CurrencyManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -223,12 +234,14 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
             val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
             val state = viewModel.expenses.collectAsState(initial = emptyList())
             val monthlyBudget by viewModel.monthlyBudget.collectAsState()
+            val initialBalance by viewModel.initialBalance.collectAsState()
             val currentSpends = viewModel.getCurrentMonthSpends(state.value)
             val expense = viewModel.getTotalExpense(state.value)
             val income = viewModel.getTotalIncome(state.value)
             val balance = viewModel.getBalance(state.value)
 
             var showBudgetDialog by remember { mutableStateOf(false) }
+            var showSetBalanceDialog by remember { mutableStateOf(false) }
 
             // Auto-check budget and negative balance alerts when expenses change
             LaunchedEffect(state.value, monthlyBudget) {
@@ -247,13 +260,27 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 )
             }
 
+            if (showSetBalanceDialog) {
+                SetCurrentBalanceDialog(
+                    currentBalance = viewModel.getTotalBalanceAmount(state.value),
+                    onSave = { targetBalance ->
+                        viewModel.setTargetCurrentBalance(targetBalance, state.value)
+                        showSetBalanceDialog = false
+                    },
+                    onDismiss = { showSetBalanceDialog = false }
+                )
+            }
+
             CardItem(
                 modifier = Modifier.constrainAs(card) {
                     top.linkTo(nameRow.bottom)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
                 },
-                balance = balance, income = income, expense = expense
+                balance = balance,
+                income = income,
+                expense = expense,
+                onEditBalanceClicked = { showSetBalanceDialog = true }
             )
             TransactionList(
                 modifier = Modifier
@@ -398,7 +425,10 @@ fun MultiFloatingActionButton(
 @Composable
 fun CardItem(
     modifier: Modifier,
-    balance: String, income: String, expense: String
+    balance: String,
+    income: String,
+    expense: String,
+    onEditBalanceClicked: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -415,11 +445,27 @@ fun CardItem(
                 .weight(1f)
         ) {
             Column {
-                ExpenseTextView(
-                    text = "Total Balance",
-                    style = Typography.titleMedium,
-                    color = Color.White
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ExpenseTextView(
+                        text = "Total Balance",
+                        style = Typography.titleMedium,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = onEditBalanceClicked,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Set Current Balance",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.size(8.dp))
                 ExpenseTextView(
                     text = balance, style = Typography.headlineLarge, color = Color.White,
@@ -771,6 +817,83 @@ fun CardRowItem(modifier: Modifier, title: String, amount: String, imaget: Int) 
         Spacer(modifier = Modifier.size(4.dp))
         ExpenseTextView(text = amount, style = Typography.titleLarge, color = Color.White)
     }
+}
+
+@Composable
+fun SetCurrentBalanceDialog(
+    currentBalance: Double,
+    onSave: (Double) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var balanceInput by remember {
+        mutableStateOf(
+            if (currentBalance % 1.0 == 0.0) {
+                currentBalance.toLong().toString()
+            } else {
+                String.format(java.util.Locale.US, "%.2f", currentBalance)
+            }
+        )
+    }
+
+    val currencySymbol = CurrencyManager.getSelectedCurrencySymbol()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Set Current Balance",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Adjust your current balance without affecting monthly income or expense stats.",
+                    fontSize = 13.sp,
+                    color = LightGrey,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = balanceInput,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue == "-" || newValue.matches(Regex("""^-?\d*(\.\d*)?$"""))) {
+                            balanceInput = newValue
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Current Balance ($currencySymbol)") },
+                    prefix = { Text("$currencySymbol ", fontWeight = FontWeight.Bold) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = balanceInput.toDoubleOrNull() ?: currentBalance
+                    onSave(parsed)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Zinc),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Save", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = LightGrey)
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)

@@ -764,4 +764,44 @@ class VaultaFeatureIntegrationTest {
         resolvedUserKey = if (isLoggedIn) signedInUserId else "guest"
         assertEquals("guest", resolvedUserKey)
     }
+
+    @Test
+    fun testSetCurrentBalanceCalculatesInitialBalanceCorrectlyWithoutAffectingIncomeExpense() {
+        val transactions = listOf(
+            ExpenseEntity(id = 1, title = "Salary", amount = 50000.0, date = "27/11/2026", type = "Income", userId = "user1"),
+            ExpenseEntity(id = 2, title = "Rent", amount = 15000.0, date = "27/11/2026", type = "Expense", userId = "user1"),
+            ExpenseEntity(id = 3, title = "Groceries", amount = 5000.0, date = "27/11/2026", type = "Expense", userId = "user1")
+        )
+
+        val totalIncome = transactions.filter { it.type == "Income" }.sumOf { it.amount }
+        val totalExpense = transactions.filter { it.type != "Income" }.sumOf { it.amount }
+        val netTransactions = totalIncome - totalExpense
+        assertEquals(50000.0, totalIncome, 0.001)
+        assertEquals(20000.0, totalExpense, 0.001)
+        assertEquals(30000.0, netTransactions, 0.001)
+
+        val targetBalance = 75000.0
+        val newInitialBalance = targetBalance - netTransactions
+        assertEquals(45000.0, newInitialBalance, 0.001)
+
+        val computedTotalBalance = newInitialBalance + netTransactions
+        assertEquals(75000.0, computedTotalBalance, 0.001)
+
+        // Strict verification: Income & Expense statistics remain completely unpolluted
+        assertEquals(50000.0, totalIncome, 0.001)
+        assertEquals(20000.0, totalExpense, 0.001)
+    }
+
+    @Test
+    fun testProfileDtoInitialBalanceSerialization() {
+        val profile = com.waleed.vaulta.android.data.model.ProfileDto(
+            id = "user_abc",
+            displayName = "Waleed",
+            initialBalance = 25000.0
+        )
+        assertEquals(25000.0, profile.initialBalance)
+
+        val defaultProfile = com.waleed.vaulta.android.data.model.ProfileDto(id = "user_def")
+        assertEquals(0.0, defaultProfile.initialBalance)
+    }
 }

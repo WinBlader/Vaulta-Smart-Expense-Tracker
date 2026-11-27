@@ -1,15 +1,18 @@
 package com.waleed.vaulta.android.feature.home
 
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.waleed.vaulta.android.base.BaseViewModel
 import com.waleed.vaulta.android.base.HomeNavigationEvent
 import com.waleed.vaulta.android.base.UiEvent
 import com.waleed.vaulta.android.data.CurrencyManager
+import com.waleed.vaulta.android.data.auth.supabase.SupabaseAuthService
 import com.waleed.vaulta.android.data.model.CurrencyItem
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.repository.AuthRepository
 import com.waleed.vaulta.android.data.repository.BudgetRepository
 import com.waleed.vaulta.android.data.repository.ExpenseRepository
+import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.utils.Utils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -21,12 +24,15 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val expenseRepository: ExpenseRepository,
     private val authRepository: AuthRepository,
-    private val budgetRepository: BudgetRepository
+    private val budgetRepository: BudgetRepository,
+    private val sessionManager: UserSessionManager,
+    private val supabaseAuthService: SupabaseAuthService
 ) : BaseViewModel() {
 
     val expenses: Flow<List<ExpenseEntity>> = expenseRepository.getAllExpenses()
     val user = authRepository.currentUser
     val monthlyBudget: StateFlow<Double> = budgetRepository.monthlyBudget
+    val initialBalance: StateFlow<Double> = sessionManager.initialBalance
 
     fun getCurrentMonthSpends(list: List<ExpenseEntity>): Double {
         return budgetRepository.calculateCurrentMonthSpends(list)
@@ -120,7 +126,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun getBalance(list: List<ExpenseEntity>, currency: CurrencyItem = CurrencyManager.getSelectedCurrency()): String {
+    fun getRawTransactionNet(list: List<ExpenseEntity>): Double {
         var balance = 0.0
         for (expense in list) {
             when (expense.type) {
@@ -128,7 +134,30 @@ class HomeViewModel @Inject constructor(
                 else -> balance -= expense.amount
             }
         }
-        return Utils.formatCurrency(balance, currency)
+        return balance
+    }
+
+    fun getTotalBalanceAmount(list: List<ExpenseEntity>): Double {
+        return sessionManager.getInitialBalance() + getRawTransactionNet(list)
+    }
+
+    fun getBalance(list: List<ExpenseEntity>, currency: CurrencyItem = CurrencyManager.getSelectedCurrency()): String {
+        val total = getTotalBalanceAmount(list)
+        return Utils.formatCurrency(total, currency)
+    }
+
+    fun setTargetCurrentBalance(targetBalance: Double, list: List<ExpenseEntity>) {
+        val netTransactions = getRawTransactionNet(list)
+        val newInitialBalance = targetBalance - netTransactions
+        val userKey = sessionManager.getCurrentUserKey()
+        sessionManager.setInitialBalance(newInitialBalance, userKey)
+        viewModelScope.launch {
+            try {
+                supabaseAuthService.updateInitialBalanceCloud(newInitialBalance, userKey)
+            } catch (e: Exception) {
+                Log.w("HomeViewModel", "Notice syncing initial balance to cloud: ${e.message}")
+            }
+        }
     }
 
     fun getTotalExpense(list: List<ExpenseEntity>, currency: CurrencyItem = CurrencyManager.getSelectedCurrency()): String {

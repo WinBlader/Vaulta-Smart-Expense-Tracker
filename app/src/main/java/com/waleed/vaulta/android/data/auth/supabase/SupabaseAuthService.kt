@@ -805,6 +805,7 @@ class SupabaseAuthService @Inject constructor(
                     avatarUrl = existingProfile?.avatarUrl,
                     currencyCode = existingProfile?.currencyCode ?: CurrencyManager.getSelectedCurrency().code,
                     monthlyBudget = existingProfile?.monthlyBudget,
+                    initialBalance = existingProfile?.initialBalance ?: sessionManager.getInitialBalance(userId),
                     privacyPolicyAccepted = existingProfile?.privacyPolicyAccepted ?: sessionManager.isPrivacyPolicyAccepted(userId),
                     updatedAt = nowStr
                 )
@@ -946,6 +947,31 @@ class SupabaseAuthService @Inject constructor(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Notice updating privacy policy in Supabase: ${e.message}")
+        }
+    }
+
+    suspend fun updateInitialBalanceCloud(initialBalance: Double, userId: String? = null): Unit = withContext(Dispatchers.IO) {
+        if (!SupabaseClientProvider.isConfigured()) return@withContext
+        try {
+            ensureSessionInitialized()
+            val resolvedUserId = userId?.ifBlank { null }
+                ?: client.auth.currentUserOrNull()?.id
+                ?: sessionManager.currentUser.value?.id?.takeIf { it.isNotBlank() && it != "guest" }
+
+            if (!resolvedUserId.isNullOrBlank() && resolvedUserId != "guest") {
+                try {
+                    client.from("profiles").update(mapOf("initial_balance" to initialBalance)) {
+                        filter {
+                            eq("id", resolvedUserId)
+                        }
+                    }
+                    Log.d(TAG, "Successfully updated initial_balance = $initialBalance in public.profiles for $resolvedUserId")
+                } catch (pe: Exception) {
+                    Log.w(TAG, "Notice updating initial_balance in public.profiles: ${pe.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed updating initial balance in cloud: ${e.message}", e)
         }
     }
 

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     auth_provider TEXT DEFAULT 'Email',
     currency_code TEXT DEFAULT 'INR',
     monthly_budget NUMERIC(14, 2) DEFAULT 0.00,
+    initial_balance NUMERIC(14, 2) DEFAULT 0.00,
     privacy_policy_accepted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -32,6 +33,9 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='monthly_budget') THEN
         ALTER TABLE public.profiles ADD COLUMN monthly_budget NUMERIC(14, 2) DEFAULT 0.00;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='initial_balance') THEN
+        ALTER TABLE public.profiles ADD COLUMN initial_balance NUMERIC(14, 2) DEFAULT 0.00;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='profiles' AND column_name='privacy_policy_accepted') THEN
         ALTER TABLE public.profiles ADD COLUMN privacy_policy_accepted BOOLEAN DEFAULT FALSE;

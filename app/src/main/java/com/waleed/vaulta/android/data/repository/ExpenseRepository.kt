@@ -308,6 +308,11 @@ class ExpenseRepositoryImpl @Inject constructor(
                         budgetManager.setMonthlyBudget(restoredBudget)
                     }
 
+                    val restoredInitialBalance = remoteProfile.initialBalance ?: 0.0
+                    if (restoredInitialBalance != 0.0 || sessionManager.getInitialBalance(effectiveUserId) == 0.0) {
+                        sessionManager.setInitialBalance(restoredInitialBalance, effectiveUserId)
+                    }
+
                     if (remoteProfile.privacyPolicyAccepted == true) {
                         sessionManager.setPrivacyPolicyAccepted(true, effectiveUserId)
                     }
@@ -500,6 +505,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)
             budgetManager.resetBudgetForUser(userKey)
+            sessionManager.setInitialBalance(0.0, userKey)
 
             if (SupabaseClientProvider.isConfigured() && userKey != "guest" && userKey.isNotBlank()) {
                 val authUid = ensureAuthenticatedSession()
@@ -512,8 +518,8 @@ class ExpenseRepositoryImpl @Inject constructor(
                                 eq("user_id", authUid)
                             }
                         }
-                        // 2. Reset monthly_budget = 0.0 in public.profiles
-                        client.from("profiles").update(mapOf("monthly_budget" to 0.0)) {
+                        // 2. Reset monthly_budget = 0.0 and initial_balance = 0.0 in public.profiles
+                        client.from("profiles").update(mapOf("monthly_budget" to 0.0, "initial_balance" to 0.0)) {
                             filter {
                                 eq("id", authUid)
                             }

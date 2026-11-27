@@ -32,6 +32,7 @@ class UserSessionManager @Inject constructor(
         private const val KEY_THEME_MODE = "app_theme_mode"
         private const val KEY_PRIVACY_POLICY_ACCEPTED = "privacy_policy_accepted_v1"
         private const val KEY_PRIVACY_POLICY_ACCEPTED_AT = "privacy_policy_accepted_v1_timestamp"
+        private const val KEY_INITIAL_BALANCE = "initial_balance_amount"
     }
 
     private val _themeMode = MutableStateFlow(prefs.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM")
@@ -44,6 +45,36 @@ class UserSessionManager @Inject constructor(
 
     private val _currentUser = MutableStateFlow<UserProfile?>(loadUserFromPrefs())
     val currentUser: StateFlow<UserProfile?> = _currentUser.asStateFlow()
+
+    private fun getInitialBalanceKey(userKey: String? = null): String {
+        val key = userKey?.ifBlank { null } ?: getCurrentUserKey()
+        return "${KEY_INITIAL_BALANCE}_$key"
+    }
+
+    private fun loadInitialBalance(userKey: String? = null): Double {
+        val key = getInitialBalanceKey(userKey)
+        return try {
+            prefs.getString(key, "0.0")?.toDoubleOrNull() ?: 0.0
+        } catch (_: Exception) {
+            0.0
+        }
+    }
+
+    private val _initialBalance = MutableStateFlow(loadInitialBalance())
+    val initialBalance: StateFlow<Double> = _initialBalance.asStateFlow()
+
+    fun getInitialBalance(userKey: String? = null): Double {
+        return loadInitialBalance(userKey)
+    }
+
+    fun setInitialBalance(amount: Double, userKey: String? = null) {
+        val key = getInitialBalanceKey(userKey)
+        prefs.edit().putString(key, amount.toString()).apply()
+        val currentKey = getCurrentUserKey()
+        if (userKey == null || userKey == currentKey) {
+            _initialBalance.value = amount
+        }
+    }
 
     fun isLoggedIn(): Boolean {
         return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
@@ -184,6 +215,7 @@ class UserSessionManager @Inject constructor(
             .putLong(KEY_REGISTERED_AT, toSave.registeredAt)
             .apply()
         _currentUser.value = toSave
+        _initialBalance.value = loadInitialBalance(toSave.id)
 
         // Persist to registered accounts store
         saveRegisteredAccount(toSave)
@@ -238,6 +270,7 @@ class UserSessionManager @Inject constructor(
             .remove(KEY_REGISTERED_AT)
             .apply()
         _currentUser.value = null
+        _initialBalance.value = 0.0
     }
 
     // ==========================================
