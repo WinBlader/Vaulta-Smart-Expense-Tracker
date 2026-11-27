@@ -582,99 +582,95 @@ fun ProfileScreen(
         )
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        ConstraintLayout(modifier = Modifier.fillMaxSize()) {
-            val (topBar, topBarContent, scrollContent) = createRefs()
-
-            Image(
-                painter = painterResource(id = R.drawable.ic_topbar),
-                contentDescription = null,
-                modifier = Modifier.constrainAs(topBar) {
-                    top.linkTo(parent.top)
-                    start.linkTo(parent.start)
-                    end.linkTo(parent.end)
-                }
-            )
-
-            // Top bar header with Back button, Title and Edit action
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Header with curved background and top bar actions inside scrollable hierarchy
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 54.dp, start = 16.dp, end = 16.dp)
-                    .constrainAs(topBarContent) {
-                        top.linkTo(parent.top)
-                        start.linkTo(parent.start)
-                        end.linkTo(parent.end)
-                    }
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_back),
-                    contentDescription = "Back",
+                    painter = painterResource(id = R.drawable.ic_topbar),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
+                )
+
+                // Top bar header with Back button, Title and Edit action
+                Box(
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .clickable { navController.popBackStack() }
-                )
-                ExpenseTextView(
-                    text = "Profile",
-                    style = Typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxWidth()
+                        .padding(top = 54.dp, start = 16.dp, end = 16.dp)
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_back),
+                        contentDescription = "Back",
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                            .clickable { viewModel.onEvent(ProfileUiEvent.OnStartEdit) },
-                        contentAlignment = Alignment.Center
+                            .align(Alignment.CenterStart)
+                            .clickable { navController.popBackStack() }
+                    )
+                    ExpenseTextView(
+                        text = "Profile",
+                        style = Typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_edit),
-                            contentDescription = "Edit Profile",
-                            modifier = Modifier.size(20.dp),
-                            colorFilter = ColorFilter.tint(Color.White)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Red.copy(alpha = 0.35f))
-                            .border(1.5.dp, Red.copy(alpha = 0.7f), CircleShape)
-                            .clickable { viewModel.onEvent(ProfileUiEvent.OnLogoutClicked) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_logout),
-                            contentDescription = "Log Out",
-                            modifier = Modifier.size(18.dp),
-                            colorFilter = ColorFilter.tint(Color.White)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                .clickable { viewModel.onEvent(ProfileUiEvent.OnStartEdit) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_edit),
+                                contentDescription = "Edit Profile",
+                                modifier = Modifier.size(20.dp),
+                                colorFilter = ColorFilter.tint(Color.White)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Red.copy(alpha = 0.35f))
+                                .border(1.5.dp, Red.copy(alpha = 0.7f), CircleShape)
+                                .clickable { viewModel.onEvent(ProfileUiEvent.OnLogoutClicked) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_logout),
+                                contentDescription = "Log Out",
+                                modifier = Modifier.size(18.dp),
+                                colorFilter = ColorFilter.tint(Color.White)
+                            )
+                        }
                     }
                 }
             }
 
-            // Scrollable Content with strict constraints for smooth top-to-bottom scrolling
+            // Cards Content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .constrainAs(scrollContent) {
-                        top.linkTo(topBarContent.bottom, margin = 16.dp)
-                        start.linkTo(parent.start)
-                        end.linkTo(parent.end)
-                        bottom.linkTo(parent.bottom)
-                        height = androidx.constraintlayout.compose.Dimension.fillToConstraints
-                    }
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
             ) {
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Header Profile Info Banner
                 Column(
                     modifier = Modifier

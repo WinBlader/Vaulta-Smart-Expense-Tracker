@@ -1276,7 +1276,7 @@ fun TransactionListScreen(
 
                     items(
                         items = uiState.transactions,
-                        key = { it.id ?: 0 }
+                        key = { it.uuid.ifBlank { it.id?.toString() ?: "${it.title}_${it.date}_${it.amount}" } }
                     ) { item ->
                         val currentItem by rememberUpdatedState(item)
                         val haptic = LocalHapticFeedback.current

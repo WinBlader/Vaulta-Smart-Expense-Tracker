@@ -76,8 +76,8 @@ class StatsViewModel @Inject constructor(
                 val millis = Utils.getMillisFromDate(dateStr)
                 labels.add(Utils.formatDayMonth(millis))
 
-                val oweAmount = oweSummaries.filter { it.date == dateStr }.sumOf { it.total_amount }
-                val owedAmount = owedSummaries.filter { it.date == dateStr }.sumOf { it.total_amount }
+                val oweAmount = oweSummaries.filter { it.date == dateStr }.sumOf { if (it.total_amount.isNaN()) 0.0 else it.total_amount.coerceAtLeast(0.0) }
+                val owedAmount = owedSummaries.filter { it.date == dateStr }.sumOf { if (it.total_amount.isNaN()) 0.0 else it.total_amount.coerceAtLeast(0.0) }
 
                 oweEntries.add(Entry(index.toFloat(), oweAmount.toFloat()))
                 owedEntries.add(Entry(index.toFloat(), owedAmount.toFloat()))
@@ -90,8 +90,8 @@ class StatsViewModel @Inject constructor(
                 entries = oweEntries,
                 secondaryEntries = owedEntries,
                 labels = labels,
-                totalAmount = totalOwe,
-                secondaryTotalAmount = totalOwed
+                totalAmount = if (totalOwe.isNaN()) 0.0 else totalOwe.coerceAtLeast(0.0),
+                secondaryTotalAmount = if (totalOwed.isNaN()) 0.0 else totalOwed.coerceAtLeast(0.0)
             )
         }
 
@@ -102,16 +102,17 @@ class StatsViewModel @Inject constructor(
         var total = 0.0
 
         sorted.forEachIndexed { index, summary ->
-            entries.add(Entry(index.toFloat(), summary.total_amount.toFloat()))
+            val amt = if (summary.total_amount.isNaN()) 0.0 else summary.total_amount.coerceAtLeast(0.0)
+            entries.add(Entry(index.toFloat(), amt.toFloat()))
             val millis = Utils.getMillisFromDate(summary.date)
             labels.add(Utils.formatDayMonth(millis))
-            total += summary.total_amount
+            total += amt
         }
 
         return ChartData(
             entries = entries,
             labels = labels,
-            totalAmount = total
+            totalAmount = if (total.isNaN()) 0.0 else total.coerceAtLeast(0.0)
         )
     }
 

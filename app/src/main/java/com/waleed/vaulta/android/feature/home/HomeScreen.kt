@@ -764,7 +764,7 @@ fun TransactionList(
         }
         items(
             items = list,
-            key = { item -> item.id ?: 0 }
+            key = { item -> item.uuid.ifBlank { item.id?.toString() ?: "${item.title}_${item.date}_${item.amount}_${item.type}" } }
         ) { item ->
             val currentItem by rememberUpdatedState(item)
             val haptic = LocalHapticFeedback.current

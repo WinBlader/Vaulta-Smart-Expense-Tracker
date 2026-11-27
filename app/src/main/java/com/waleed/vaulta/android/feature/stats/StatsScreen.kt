@@ -358,118 +358,128 @@ fun StatsLineChart(
                 .fillMaxWidth()
                 .height(240.dp),
             update = { view ->
-                val lineChart = view.findViewById<LineChart>(R.id.lineChart)
+                try {
+                    val lineChart = view.findViewById<LineChart>(R.id.lineChart)
 
-                lineChart.description.isEnabled = false
-                lineChart.legend.isEnabled = false
-                lineChart.setTouchEnabled(true)
-                lineChart.isDragEnabled = true
-                lineChart.setScaleEnabled(false)
-                lineChart.setPinchZoom(false)
-                lineChart.setDrawGridBackground(false)
+                    lineChart.description.isEnabled = false
+                    lineChart.legend.isEnabled = false
+                    lineChart.setTouchEnabled(true)
+                    lineChart.isDragEnabled = true
+                    lineChart.setScaleEnabled(false)
+                    lineChart.setPinchZoom(false)
+                    lineChart.setDrawGridBackground(false)
 
-                val dataSets = mutableListOf<com.github.mikephil.charting.interfaces.datasets.ILineDataSet>()
+                    val dataSets = mutableListOf<com.github.mikephil.charting.interfaces.datasets.ILineDataSet>()
 
-                val primaryLabel = if (isCredit) "You Owe" else if (isIncome) "Income" else "Expenses"
-                val dataSet1 = LineDataSet(entries, primaryLabel).apply {
-                    color = primaryColor
-                    lineWidth = 3f
-                    mode = LineDataSet.Mode.CUBIC_BEZIER
-                    axisDependency = YAxis.AxisDependency.LEFT
-                    setDrawCircles(true)
-                    circleRadius = 5f
-                    setCircleColor(primaryColor)
-                    setDrawCircleHole(true)
-                    circleHoleRadius = 2.5f
-                    circleHoleColor = android.graphics.Color.WHITE
-                    setDrawValues(true)
-                    valueTextSize = 10f
-                    valueTextColor = primaryColor
-                    valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            return "${CurrencyManager.getSelectedCurrencySymbol()}${value.toInt()}"
-                        }
-                    }
-                    setDrawFilled(!isCredit)
-                    if (!isCredit) {
-                        val drawable = ContextCompat.getDrawable(context, R.drawable.char_gradient)
-                        drawable?.let { fillDrawable = it }
-                    }
-                }
-                dataSets.add(dataSet1)
-
-                if (isCredit && secondaryEntries.isNotEmpty()) {
-                    val dataSet2 = LineDataSet(secondaryEntries, "Owed to You").apply {
-                        color = secondaryColor
-                        lineWidth = 3f
-                        mode = LineDataSet.Mode.CUBIC_BEZIER
-                        axisDependency = YAxis.AxisDependency.LEFT
-                        setDrawCircles(true)
-                        circleRadius = 5f
-                        setCircleColor(secondaryColor)
-                        setDrawCircleHole(true)
-                        circleHoleRadius = 2.5f
-                        circleHoleColor = android.graphics.Color.WHITE
-                        setDrawValues(true)
-                        valueTextSize = 10f
-                        valueTextColor = secondaryColor
-                        valueFormatter = object : ValueFormatter() {
-                            override fun getFormattedValue(value: Float): String {
-                                return "${CurrencyManager.getSelectedCurrencySymbol()}${value.toInt()}"
+                    if (entries.isNotEmpty()) {
+                        val primaryLabel = if (isCredit) "You Owe" else if (isIncome) "Income" else "Expenses"
+                        val dataSet1 = LineDataSet(entries, primaryLabel).apply {
+                            color = primaryColor
+                            lineWidth = 3f
+                            mode = LineDataSet.Mode.CUBIC_BEZIER
+                            axisDependency = YAxis.AxisDependency.LEFT
+                            setDrawCircles(true)
+                            circleRadius = 5f
+                            setCircleColor(primaryColor)
+                            setDrawCircleHole(true)
+                            circleHoleRadius = 2.5f
+                            circleHoleColor = android.graphics.Color.WHITE
+                            setDrawValues(true)
+                            valueTextSize = 10f
+                            valueTextColor = primaryColor
+                            valueFormatter = object : ValueFormatter() {
+                                override fun getFormattedValue(value: Float): String {
+                                    return "${CurrencyManager.getSelectedCurrencySymbol()}${value.toInt()}"
+                                }
+                            }
+                            setDrawFilled(!isCredit)
+                            if (!isCredit) {
+                                val drawable = ContextCompat.getDrawable(context, R.drawable.char_gradient)
+                                drawable?.let { fillDrawable = it }
                             }
                         }
-                        setDrawFilled(false)
+                        dataSets.add(dataSet1)
                     }
-                    dataSets.add(dataSet2)
-                }
 
-                // Left Y-Axis
-                lineChart.axisLeft.apply {
-                    isEnabled = true
-                    setDrawGridLines(true)
-                    gridColor = android.graphics.Color.parseColor("#E8EAEA")
-                    textColor = android.graphics.Color.GRAY
-                    axisMinimum = 0f
-                    setLabelCount(4, true)
-                    valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            val s = CurrencyManager.getSelectedCurrencySymbol(); return if (value >= 1000) "$s${(value / 1000).toInt()}k" else "$s${value.toInt()}"
+                    if (isCredit && secondaryEntries.isNotEmpty()) {
+                        val dataSet2 = LineDataSet(secondaryEntries, "Owed to You").apply {
+                            color = secondaryColor
+                            lineWidth = 3f
+                            mode = LineDataSet.Mode.CUBIC_BEZIER
+                            axisDependency = YAxis.AxisDependency.LEFT
+                            setDrawCircles(true)
+                            circleRadius = 5f
+                            setCircleColor(secondaryColor)
+                            setDrawCircleHole(true)
+                            circleHoleRadius = 2.5f
+                            circleHoleColor = android.graphics.Color.WHITE
+                            setDrawValues(true)
+                            valueTextSize = 10f
+                            valueTextColor = secondaryColor
+                            valueFormatter = object : ValueFormatter() {
+                                override fun getFormattedValue(value: Float): String {
+                                    return "${CurrencyManager.getSelectedCurrencySymbol()}${value.toInt()}"
+                                }
+                            }
+                            setDrawFilled(false)
+                        }
+                        dataSets.add(dataSet2)
+                    }
+
+                    // Left Y-Axis
+                    lineChart.axisLeft.apply {
+                        isEnabled = true
+                        setDrawGridLines(true)
+                        gridColor = android.graphics.Color.parseColor("#E8EAEA")
+                        textColor = android.graphics.Color.GRAY
+                        axisMinimum = 0f
+                        setLabelCount(4, true)
+                        valueFormatter = object : ValueFormatter() {
+                            override fun getFormattedValue(value: Float): String {
+                                val s = CurrencyManager.getSelectedCurrencySymbol(); return if (value >= 1000) "$s${(value / 1000).toInt()}k" else "$s${value.toInt()}"
+                            }
                         }
                     }
-                }
 
-                // Right Y-Axis (disabled)
-                lineChart.axisRight.isEnabled = false
+                    // Right Y-Axis (disabled)
+                    lineChart.axisRight.isEnabled = false
 
-                // X-Axis
-                lineChart.xAxis.apply {
-                    isEnabled = true
-                    position = XAxis.XAxisPosition.BOTTOM
-                    setDrawGridLines(false)
-                    setDrawAxisLine(true)
-                    axisLineColor = android.graphics.Color.parseColor("#E8EAEA")
-                    textColor = android.graphics.Color.GRAY
-                    granularity = 1f
-                    setLabelCount(minOf(labels.size, 5), true)
-                    valueFormatter = object : ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            val index = value.toInt()
-                            return if (index in labels.indices) labels[index] else ""
+                    // X-Axis
+                    lineChart.xAxis.apply {
+                        isEnabled = true
+                        position = XAxis.XAxisPosition.BOTTOM
+                        setDrawGridLines(false)
+                        setDrawAxisLine(true)
+                        axisLineColor = android.graphics.Color.parseColor("#E8EAEA")
+                        textColor = android.graphics.Color.GRAY
+                        granularity = 1f
+                        setLabelCount(minOf(labels.size, 5).coerceAtLeast(1), true)
+                        valueFormatter = object : ValueFormatter() {
+                            override fun getFormattedValue(value: Float): String {
+                                val index = value.toInt()
+                                return if (index in labels.indices) labels[index] else ""
+                            }
+                        }
+                        val effectiveCount = maxOf(entries.size, secondaryEntries.size)
+                        if (effectiveCount <= 1) {
+                            axisMinimum = -0.5f
+                            axisMaximum = 1f
+                        } else {
+                            axisMinimum = -0.2f
+                            axisMaximum = (effectiveCount - 0.8f).coerceAtLeast(1f)
                         }
                     }
-                    val effectiveCount = maxOf(entries.size, secondaryEntries.size)
-                    if (effectiveCount <= 1) {
-                        axisMinimum = -0.5f
-                        axisMaximum = 1f
+
+                    if (dataSets.isNotEmpty()) {
+                        lineChart.data = LineData(dataSets)
+                        lineChart.notifyDataSetChanged()
+                        lineChart.invalidate()
                     } else {
-                        axisMinimum = -0.2f
-                        axisMaximum = effectiveCount - 0.8f
+                        lineChart.clear()
                     }
+                } catch (t: Throwable) {
+                    android.util.Log.e("StatsLineChart", "Safe catch during chart update", t)
                 }
-
-                lineChart.data = LineData(dataSets)
-                lineChart.notifyDataSetChanged()
-                lineChart.invalidate()
             }
         )
     }

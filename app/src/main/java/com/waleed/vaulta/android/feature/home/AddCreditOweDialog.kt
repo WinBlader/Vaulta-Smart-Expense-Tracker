@@ -59,6 +59,7 @@ fun AddCreditOweDialog(
     var date by remember { mutableStateOf(initialEntity?.createdAt ?: System.currentTimeMillis()) }
     var note by remember { mutableStateOf(initialEntity?.note ?: "") }
     var counterpartyId by remember { mutableStateOf<String?>(initialEntity?.counterpartyId) }
+    var linkedUserMaskedContact by remember { mutableStateOf<String?>(null) }
     var lookupResult by remember { mutableStateOf<com.waleed.vaulta.android.data.model.ContactLookupResult?>(null) }
     var isLookingUp by remember { mutableStateOf(false) }
     var searchSuggestions by remember { mutableStateOf<List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult>>(emptyList()) }
@@ -82,15 +83,18 @@ fun AddCreditOweDialog(
             onContactSelected = { cName, cContact ->
                 personName = cName
                 personContact = cContact
+                linkedUserMaskedContact = null
             }
         )
     }
 
     LaunchedEffect(personContact) {
         val trimmed = personContact.trim()
-        if (trimmed.length < 3 || onLookupContact == null) {
-            counterpartyId = null
-            lookupResult = null
+        if (trimmed.length < 3 || trimmed.contains("*") || onLookupContact == null) {
+            if (!trimmed.contains("*")) {
+                counterpartyId = null
+                lookupResult = null
+            }
             isLookingUp = false
             return@LaunchedEffect
         }
@@ -241,7 +245,10 @@ fun AddCreditOweDialog(
                 // Person Contact (Optional for sync) + Pick from Contacts button
                 OutlinedTextField(
                     value = personContact,
-                    onValueChange = { personContact = it },
+                    onValueChange = {
+                        personContact = it
+                        linkedUserMaskedContact = null
+                    },
                     label = { Text("Email or Phone (Optional for Sync)") },
                     placeholder = { Text("john@example.com or +1234567890") },
                     trailingIcon = {
@@ -265,14 +272,30 @@ fun AddCreditOweDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                if (isLookingUp) {
+                if (counterpartyId != null && !linkedUserMaskedContact.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "✓ Vaulta user linked ($linkedUserMaskedContact)",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                } else if (isLookingUp) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Checking Vaulta user...", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                } else if (lookupResult != null && personContact.isNotBlank()) {
+                } else if (lookupResult != null && personContact.isNotBlank() && !personContact.contains("*")) {
                     Spacer(modifier = Modifier.height(4.dp))
                     if (lookupResult!!.found) {
                         val nameToShow = lookupResult!!.displayName ?: "Vaulta user"
@@ -320,10 +343,9 @@ fun AddCreditOweDialog(
                                         .clickable {
                                             personName = userResult.displayName
                                             counterpartyId = userResult.userId
-                                            if (!userResult.maskedContact.isNullOrBlank()) {
-                                                personContact = userResult.maskedContact
-                                            }
+                                            linkedUserMaskedContact = userResult.maskedContact
                                             searchSuggestions = emptyList()
+                                            lookupResult = null
                                         }
                                         .padding(horizontal = 6.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -454,7 +476,7 @@ fun AddCreditOweDialog(
                                     parsedAmount,
                                     typeStr,
                                     note.trim().ifBlank { null },
-                                    personContact.trim().ifBlank { null },
+                                    if (personContact.contains("*")) null else personContact.trim().ifBlank { null },
                                     counterpartyId
                                 )
                             }

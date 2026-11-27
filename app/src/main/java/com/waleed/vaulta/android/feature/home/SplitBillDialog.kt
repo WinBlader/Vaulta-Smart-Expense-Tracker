@@ -48,7 +48,8 @@ data class SplitParticipant(
     val customAmount: String = "",
     val counterpartyId: String? = null,
     val lookupResult: com.waleed.vaulta.android.data.model.ContactLookupResult? = null,
-    val isLookingUp: Boolean = false
+    val isLookingUp: Boolean = false,
+    val linkedUserMaskedContact: String? = null
 )
 
 @Composable
@@ -99,7 +100,8 @@ fun SplitBillDialog(
                     if (activeContactPickerIndex < list.size) {
                         list[activeContactPickerIndex] = list[activeContactPickerIndex].copy(
                             name = cName,
-                            contact = cContact
+                            contact = cContact,
+                            linkedUserMaskedContact = null
                         )
                     }
                 }
@@ -395,7 +397,7 @@ fun SplitBillDialog(
                                     value = participant.contact,
                                     onValueChange = { newContact ->
                                         participants = participants.toMutableList().also {
-                                            it[index] = it[index].copy(contact = newContact)
+                                            it[index] = it[index].copy(contact = newContact, linkedUserMaskedContact = null)
                                         }
                                     },
                                     label = { Text("Email or Phone (Optional for Sync)") },
@@ -424,11 +426,13 @@ fun SplitBillDialog(
 
                                 LaunchedEffect(participant.contact) {
                                     val trimmed = participant.contact.trim()
-                                    if (trimmed.length < 3 || onLookupContact == null) {
-                                        if (participant.lookupResult != null || participant.counterpartyId != null || participant.isLookingUp) {
-                                            participants = participants.toMutableList().also {
-                                                if (index < it.size) {
-                                                    it[index] = it[index].copy(lookupResult = null, counterpartyId = null, isLookingUp = false)
+                                    if (trimmed.length < 3 || trimmed.contains("*") || onLookupContact == null) {
+                                        if (!trimmed.contains("*")) {
+                                            if (participant.lookupResult != null || participant.counterpartyId != null || participant.isLookingUp) {
+                                                participants = participants.toMutableList().also {
+                                                    if (index < it.size) {
+                                                        it[index] = it[index].copy(lookupResult = null, counterpartyId = null, isLookingUp = false)
+                                                    }
                                                 }
                                             }
                                         }
@@ -459,14 +463,30 @@ fun SplitBillDialog(
                                     }
                                 }
 
-                                if (participant.isLookingUp) {
+                                if (participant.counterpartyId != null && !participant.linkedUserMaskedContact.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "✓ Vaulta user linked (${participant.linkedUserMaskedContact})",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF10B981)
+                                        )
+                                    }
+                                } else if (participant.isLookingUp) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("Checking Vaulta user...", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                } else if (participant.lookupResult != null && participant.contact.isNotBlank()) {
+                                } else if (participant.lookupResult != null && participant.contact.isNotBlank() && !participant.contact.contains("*")) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     if (participant.lookupResult.found) {
                                         val nameToShow = participant.lookupResult.displayName ?: "Vaulta user"
@@ -534,8 +554,9 @@ fun SplitBillDialog(
                                                                 if (index < list.size) {
                                                                     list[index] = list[index].copy(
                                                                         name = userResult.displayName,
-                                                                        contact = userResult.maskedContact ?: list[index].contact,
-                                                                        counterpartyId = userResult.userId
+                                                                        counterpartyId = userResult.userId,
+                                                                        linkedUserMaskedContact = userResult.maskedContact,
+                                                                        lookupResult = null
                                                                     )
                                                                 }
                                                             }
@@ -660,7 +681,7 @@ fun SplitBillDialog(
                                         creatorContact = currentUserContact.ifBlank { null },
                                         counterpartyId = p.counterpartyId,
                                         counterpartyName = p.name.trim(),
-                                        counterpartyContact = p.contact.trim().ifBlank { null },
+                                        counterpartyContact = if (p.contact.contains("*")) null else p.contact.trim().ifBlank { null },
                                         direction = "OWED_TO_CREATOR",
                                         status = "PENDING",
                                         timestamp = now,

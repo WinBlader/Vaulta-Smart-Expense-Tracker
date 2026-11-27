@@ -147,13 +147,14 @@ class ExpenseRepositoryImpl @Inject constructor(
                         val isOwedToMe = if (isCreator) co.type.equals("CREDIT", ignoreCase = true) else !co.type.equals("CREDIT", ignoreCase = true)
                         list.add(
                             ExpenseEntity(
-                                id = null,
+                                id = ("co_${co.id}".hashCode() and 0x7FFFFFFF),
                                 title = co.personName,
-                                amount = co.amount,
+                                amount = if (co.amount.isNaN()) 0.0 else co.amount.coerceAtLeast(0.0),
                                 date = Utils.formatDateToHumanReadableForm(co.createdAt),
                                 type = if (isOwedToMe) "Owed to You" else "You Owe",
                                 userId = userKey,
-                                note = co.note ?: if (isOwedToMe) "Owed to you" else "You owe"
+                                note = co.note ?: if (isOwedToMe) "Owed to you" else "You owe",
+                                uuid = "co_${co.id}"
                             )
                         )
                     }
@@ -167,13 +168,14 @@ class ExpenseRepositoryImpl @Inject constructor(
                         val personName = if (isCreator) ss.counterpartyName else ss.creatorName
                         list.add(
                             ExpenseEntity(
-                                id = null,
+                                id = ("sp_${ss.id}".hashCode() and 0x7FFFFFFF),
                                 title = personName,
-                                amount = ss.splitAmount,
+                                amount = if (ss.splitAmount.isNaN()) 0.0 else ss.splitAmount.coerceAtLeast(0.0),
                                 date = Utils.formatDateToHumanReadableForm(ss.timestamp),
                                 type = if (isOwedToMe) "Owed to You" else "You Owe",
                                 userId = userKey,
-                                note = ss.title
+                                note = ss.title,
+                                uuid = "sp_${ss.id}"
                             )
                         )
                     }
