@@ -6,10 +6,13 @@ import com.waleed.vaulta.android.data.CurrencyManager
 import com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider
 import com.waleed.vaulta.android.data.budget.BudgetManager
 import com.waleed.vaulta.android.data.dao.ExpenseDao
+import com.waleed.vaulta.android.data.dao.SharedSplitDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.ExpenseSummary
 import com.waleed.vaulta.android.data.model.ProfileDto
 import com.waleed.vaulta.android.data.model.RemoteTransactionDto
+import com.waleed.vaulta.android.data.model.SharedSplitDto
+import com.waleed.vaulta.android.data.model.SharedSplitEntity
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.data.sync.CloudSyncWorker
 import com.waleed.vaulta.android.utils.Utils
@@ -39,12 +42,22 @@ interface ExpenseRepository {
     suspend fun syncUserTransactions()
     suspend fun syncAllCloudData(userId: String)
     suspend fun clearCurrentUserData()
+
+    // Shared Splits & Universal Ledger
+    fun getAllSharedSplits(): Flow<List<SharedSplitEntity>>
+    suspend fun insertSharedSplit(split: SharedSplitEntity): Boolean
+    suspend fun insertSharedSplits(splits: List<SharedSplitEntity>): Boolean
+    suspend fun updateSharedSplit(split: SharedSplitEntity): Boolean
+    suspend fun settleSharedSplit(id: String): Boolean
+    suspend fun deleteSharedSplit(id: String): Boolean
+    suspend fun syncSharedSplits()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class ExpenseRepositoryImpl @Inject constructor(
     private val dao: ExpenseDao,
+    private val sharedSplitDao: SharedSplitDao,
     private val budgetManager: BudgetManager,
     private val sessionManager: UserSessionManager,
     @ApplicationContext private val context: Context? = null
@@ -427,6 +440,9 @@ class ExpenseRepositoryImpl @Inject constructor(
                 val finalLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
                 budgetManager.checkBudgetAndNotify(finalLocalList)
                 budgetManager.checkBalanceAndNotify(finalLocalList)
+
+                // 4d. Reinstall Hydration & Sync: Shared Splits & Universal Ledger
+                syncSharedSplitsInternal(effectiveUserId, authUid, fallbackEmail, currentUser?.phoneNumber ?: "")
             } catch (e: Exception) {
                 Log.e("VaultaCloudSync", "Failed during Supabase pull/push sync: ${e.message}", e)
                 context?.let { CloudSyncWorker.enqueue(it) }
@@ -504,6 +520,7 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)
+            sharedSplitDao.deleteSharedSplitsForUser(userKey)
             budgetManager.resetBudgetForUser(userKey)
             sessionManager.setInitialBalance(0.0, userKey)
 
@@ -536,5 +553,210 @@ class ExpenseRepositoryImpl @Inject constructor(
             Log.e("VaultaCloudSync", "Notice during clearCurrentUserData: ${e.message}", e)
         }
         Unit
+    }
+
+    // ==========================================
+    // Shared Splits & Universal Ledger Implementation
+    // ==========================================
+
+    override fun getAllSharedSplits(): Flow<List<SharedSplitEntity>> {
+        return sessionManager.currentUser.flatMapLatest { user ->
+            val userKey = sessionManager.getCurrentUserKey()
+            val contact = user?.email?.ifBlank { user.phoneNumber } ?: ""
+            sharedSplitDao.getSharedSplitsForUser(userKey, contact)
+        }
+    }
+
+    override suspend fun insertSharedSplit(split: SharedSplitEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
+            sharedSplitDao.insertSharedSplit(split)
+            pushSharedSplitToCloud(split)
+            true
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error inserting shared split: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun insertSharedSplits(splits: List<SharedSplitEntity>): Boolean = withContext(Dispatchers.IO) {
+        try {
+            sharedSplitDao.insertSharedSplits(splits)
+            for (split in splits) {
+                pushSharedSplitToCloud(split)
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error inserting shared splits: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun updateSharedSplit(split: SharedSplitEntity): Boolean = withContext(Dispatchers.IO) {
+        try {
+            sharedSplitDao.updateSharedSplit(split)
+            pushSharedSplitToCloud(split)
+            true
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error updating shared split: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun settleSharedSplit(id: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            sharedSplitDao.updateStatus(id, "SETTLED")
+            val split = sharedSplitDao.getSharedSplitById(id)
+            if (split != null) {
+                pushSharedSplitToCloud(split)
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error settling shared split: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun deleteSharedSplit(id: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            sharedSplitDao.deleteSharedSplitById(id)
+            if (SupabaseClientProvider.isConfigured()) {
+                val authUid = ensureAuthenticatedSession()
+                if (!authUid.isNullOrBlank()) {
+                    try {
+                        SupabaseClientProvider.client.from("shared_splits").delete {
+                            filter {
+                                eq("id", id)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("VaultaCloudSync", "Notice deleting remote shared split: ${e.message}", e)
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error deleting shared split: ${e.message}", e)
+            false
+        }
+    }
+
+    override suspend fun syncSharedSplits(): Unit = withContext(Dispatchers.IO) {
+        val user = sessionManager.currentUser.first()
+        val userKey = sessionManager.getCurrentUserKey()
+        val authUid = ensureAuthenticatedSession()
+        if (!authUid.isNullOrBlank()) {
+            syncSharedSplitsInternal(userKey, authUid, user?.email ?: "", user?.phoneNumber ?: "")
+        }
+    }
+
+    private suspend fun syncSharedSplitsInternal(
+        userKey: String,
+        authUid: String,
+        email: String,
+        phone: String
+    ) {
+        if (!SupabaseClientProvider.isConfigured() || authUid.isBlank()) return
+        try {
+            val client = SupabaseClientProvider.client
+
+            // 1. Fetch remote splits involving this user
+            val remoteSplits = client.from("shared_splits").select {
+                filter {
+                    or {
+                        eq("creator_id", authUid)
+                        if (userKey != authUid) {
+                            eq("creator_id", userKey)
+                        }
+                        eq("counterparty_id", authUid)
+                        if (email.isNotBlank()) {
+                            eq("counterparty_contact", email)
+                        }
+                        if (phone.isNotBlank()) {
+                            eq("counterparty_contact", phone)
+                        }
+                    }
+                }
+            }.decodeList<SharedSplitDto>()
+
+            for (remote in remoteSplits) {
+                // If counterparty_contact matched our email or phone, but counterparty_id wasn't set, claim it
+                val shouldClaimCounterparty = remote.counterpartyId.isNullOrBlank() &&
+                    ((email.isNotBlank() && remote.counterpartyContact == email) ||
+                     (phone.isNotBlank() && remote.counterpartyContact == phone))
+
+                val effectiveCounterpartyId = if (shouldClaimCounterparty) authUid else remote.counterpartyId
+
+                val entity = SharedSplitEntity(
+                    id = remote.id,
+                    groupId = remote.groupId,
+                    title = remote.title,
+                    totalAmount = remote.totalAmount,
+                    splitAmount = remote.splitAmount,
+                    creatorId = remote.creatorId,
+                    creatorName = remote.creatorName,
+                    creatorContact = remote.creatorContact,
+                    counterpartyId = effectiveCounterpartyId,
+                    counterpartyName = remote.counterpartyName,
+                    counterpartyContact = remote.counterpartyContact,
+                    direction = remote.direction,
+                    status = remote.status,
+                    timestamp = remote.timestamp,
+                    notes = remote.notes
+                )
+                sharedSplitDao.insertSharedSplit(entity)
+
+                if (shouldClaimCounterparty) {
+                    try {
+                        client.from("shared_splits").update(mapOf("counterparty_id" to authUid)) {
+                            filter {
+                                eq("id", remote.id)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("VaultaCloudSync", "Notice updating counterparty_id: ${e.message}", e)
+                    }
+                }
+            }
+
+            // 2. Push any local splits created by this user that are not on cloud or need sync
+            val localCreated = sharedSplitDao.getSplitsCreatedByUser(userKey)
+            for (local in localCreated) {
+                val existsRemote = remoteSplits.any { it.id == local.id }
+                if (!existsRemote) {
+                    pushSharedSplitToCloud(local)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Notice syncing shared splits: ${e.message}", e)
+        }
+    }
+
+    private suspend fun pushSharedSplitToCloud(split: SharedSplitEntity) {
+        if (!SupabaseClientProvider.isConfigured()) return
+        val authUid = ensureAuthenticatedSession() ?: return
+        try {
+            val client = SupabaseClientProvider.client
+            val dto = SharedSplitDto(
+                id = split.id,
+                groupId = split.groupId,
+                title = split.title,
+                totalAmount = split.totalAmount,
+                splitAmount = split.splitAmount,
+                creatorId = if (split.creatorId == "guest" || split.creatorId.isBlank()) authUid else split.creatorId,
+                creatorName = split.creatorName,
+                creatorContact = split.creatorContact,
+                counterpartyId = split.counterpartyId,
+                counterpartyName = split.counterpartyName,
+                counterpartyContact = split.counterpartyContact,
+                direction = split.direction,
+                status = split.status,
+                timestamp = split.timestamp,
+                notes = split.notes
+            )
+            client.from("shared_splits").upsert(dto)
+            Log.d("VaultaCloudSync", "Successfully pushed shared split ${split.id} to Supabase")
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Notice pushing shared split ${split.id}: ${e.message}", e)
+        }
     }
 }

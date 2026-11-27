@@ -41,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePickerDialog
@@ -390,6 +392,11 @@ fun TransactionListScreen(
         }
     }
 
+    val currentUser by viewModel.currentUser.collectAsState()
+    val currentUserId = currentUser?.id ?: ""
+    val currentUserEmail = currentUser?.email ?: ""
+    val currentUserPhone = currentUser?.phoneNumber ?: ""
+
     Scaffold(
         topBar = {
             Column(
@@ -535,7 +542,7 @@ fun TransactionListScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = LightGrey
                             )
-                            listOf("All", "Expense", "Income", "Credit / Owe").forEach { type ->
+                            listOf("All", "Expense", "Income", "Credit / Owe", "Shared Splits").forEach { type ->
                                 val isSelected = uiState.filterType == type
                                 FilterChip(
                                     selected = isSelected,
@@ -719,7 +726,206 @@ fun TransactionListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (uiState.transactions.isEmpty()) {
+            if (uiState.filterType == "Shared Splits") {
+                if (uiState.sharedSplits.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_credit_owe),
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = LightGrey
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No shared splits found.",
+                                color = LightGrey,
+                                fontSize = 15.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        item {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Universal Shared Splits & Group Ledger",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = LightGrey.copy(alpha = 0.8f)
+                            )
+                        }
+
+                        items(
+                            items = uiState.sharedSplits,
+                            key = { it.id }
+                        ) { split ->
+                            val isCreator = split.creatorId == currentUserId || (split.creatorContact != null && (split.creatorContact == currentUserEmail || split.creatorContact == currentUserPhone))
+                            
+                            // Perspective calculation
+                            val (displayPerson, displayDirectionText, isPositiveForMe) = if (isCreator) {
+                                if (split.direction == "OWED_TO_CREATOR") {
+                                    Triple(split.counterpartyName, "owes you", true)
+                                } else {
+                                    Triple(split.counterpartyName, "you owe", false)
+                                }
+                            } else {
+                                if (split.direction == "OWED_TO_CREATOR") {
+                                    Triple(split.creatorName, "you owe", false)
+                                } else {
+                                    Triple(split.creatorName, "owes you", true)
+                                }
+                            }
+
+                            val isSettled = split.status.equals("SETTLED", ignoreCase = true)
+                            val isCloudSynced = !split.counterpartyId.isNullOrBlank() || !split.creatorId.isBlank()
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSettled) LightGrey.copy(alpha = 0.3f) else if (isPositiveForMe) Green.copy(alpha = 0.4f) else Red.copy(alpha = 0.4f)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = split.title,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "$displayPerson • $displayDirectionText",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isSettled) LightGrey else if (isPositiveForMe) Green else Red
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                text = (if (isPositiveForMe) "+" else "-") + Utils.formatCurrency(split.splitAmount, currentCurrency),
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSettled) LightGrey else if (isPositiveForMe) Green else Red
+                                            )
+                                            if (split.totalAmount > split.splitAmount) {
+                                                Text(
+                                                    text = "Total: ${Utils.formatCurrency(split.totalAmount, currentCurrency)}",
+                                                    fontSize = 10.5.sp,
+                                                    color = LightGrey
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Status chips
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Settled vs Pending Chip
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isSettled) LightGrey.copy(alpha = 0.2f) else Color(0xFF6366F1).copy(alpha = 0.15f))
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isSettled) "Settled" else "Pending",
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSettled) LightGrey else Color(0xFF6366F1)
+                                                )
+                                            }
+
+                                            // Sync Status Chip
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isCloudSynced) Green.copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f))
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isCloudSynced) "Synced" else "Local",
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isCloudSynced) Green else Color(0xFFF59E0B)
+                                                )
+                                            }
+                                        }
+
+                                        // Actions: Settle Up or Delete
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (!isSettled) {
+                                                Button(
+                                                    onClick = { viewModel.settleSharedSplit(split.id) },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                                                ) {
+                                                    Text("Settle Up", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = { viewModel.deleteSharedSplit(split.id) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.ic_delete),
+                                                    contentDescription = "Delete",
+                                                    tint = Red.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
+                    }
+                }
+            } else if (uiState.transactions.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

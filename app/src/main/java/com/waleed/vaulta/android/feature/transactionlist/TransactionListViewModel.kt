@@ -29,8 +29,9 @@ data class FilterParams(
 data class TransactionListUiState(
     val transactions: List<ExpenseEntity> = emptyList(),
     val allTransactions: List<ExpenseEntity> = emptyList(),
+    val sharedSplits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity> = emptyList(),
     val searchQuery: String = "",
-    val filterType: String = "All", // "All", "Expense", "Income"
+    val filterType: String = "All", // "All", "Expense", "Income", "Credit / Owe", "Shared Splits"
     val selectedCategory: String = "All", // "All" or specific category
     val availableCategories: List<String> = emptyList(),
     val dateRange: String = "All Time", // "All Time", "Today", "This Week", "This Month", "Last Month", "Custom"
@@ -45,15 +46,18 @@ data class TransactionListUiState(
 
 @HiltViewModel
 class TransactionListViewModel @Inject constructor(
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val sessionManager: com.waleed.vaulta.android.data.session.UserSessionManager
 ) : BaseViewModel() {
 
     private val _filterParams = MutableStateFlow(FilterParams())
+    val currentUser = sessionManager.currentUser
 
     val uiState: StateFlow<TransactionListUiState> = combine(
         expenseRepository.getAllExpenses(),
+        expenseRepository.getAllSharedSplits(),
         _filterParams
-    ) { allExpenses, filters ->
+    ) { allExpenses, allSplits, filters ->
 
         // 1. Search Query Filter
         val queryFiltered = if (filters.query.isBlank()) {
@@ -110,9 +114,26 @@ class TransactionListViewModel @Inject constructor(
             categoriesSet.add(it)
         }
 
+        val userKey = sessionManager.getCurrentUserKey()
+
+        // Filter Shared Splits by query
+        val filteredSplits = if (filters.query.isBlank()) {
+            allSplits
+        } else {
+            val q = filters.query.trim().lowercase()
+            allSplits.filter { s ->
+                s.title.lowercase().contains(q) ||
+                s.creatorName.lowercase().contains(q) ||
+                s.counterpartyName.lowercase().contains(q) ||
+                s.splitAmount.toString().contains(q) ||
+                (s.notes?.lowercase()?.contains(q) == true)
+            }
+        }
+
         TransactionListUiState(
             transactions = dateFiltered,
             allTransactions = allExpenses,
+            sharedSplits = filteredSplits,
             searchQuery = filters.query,
             filterType = filters.type,
             selectedCategory = filters.category,
@@ -189,6 +210,36 @@ class TransactionListViewModel @Inject constructor(
                     _navigationEvent.emit(NavigationEvent.NavigateBack)
                 }
             }
+        }
+    }
+
+    fun settleSharedSplit(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.settleSharedSplit(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Split marked as settled",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun deleteSharedSplit(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.deleteSharedSplit(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Split deleted",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun syncSharedSplits() {
+        viewModelScope.launch {
+            expenseRepository.syncSharedSplits()
         }
     }
 

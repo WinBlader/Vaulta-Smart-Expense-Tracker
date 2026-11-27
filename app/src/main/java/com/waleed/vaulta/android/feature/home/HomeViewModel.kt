@@ -30,9 +30,83 @@ class HomeViewModel @Inject constructor(
 ) : BaseViewModel() {
 
     val expenses: Flow<List<ExpenseEntity>> = expenseRepository.getAllExpenses()
+    val sharedSplits: Flow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>> = expenseRepository.getAllSharedSplits()
     val user = authRepository.currentUser
     val monthlyBudget: StateFlow<Double> = budgetRepository.monthlyBudget
     val initialBalance: StateFlow<Double> = sessionManager.initialBalance
+
+    fun insertSharedSplits(splits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>, creatorExpense: ExpenseEntity?) {
+        viewModelScope.launch {
+            if (creatorExpense != null) {
+                expenseRepository.insertExpense(creatorExpense)
+            }
+            val success = expenseRepository.insertSharedSplits(splits)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Split bill created with ${splits.size} members",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun saveCreditOwe(expense: ExpenseEntity, counterpartyContact: String?) {
+        viewModelScope.launch {
+            val success = expenseRepository.insertExpense(expense)
+            if (success) {
+                if (!counterpartyContact.isNullOrBlank()) {
+                    val userKey = sessionManager.getCurrentUserKey()
+                    val currentUser = user.value
+                    val isOwedToUser = expense.type.equals("Owed to You", ignoreCase = true)
+                    val splitEntity = com.waleed.vaulta.android.data.model.SharedSplitEntity(
+                        id = if (expense.uuid.isNotBlank()) expense.uuid else java.util.UUID.randomUUID().toString(),
+                        title = expense.title,
+                        totalAmount = expense.amount,
+                        splitAmount = expense.amount,
+                        creatorId = userKey,
+                        creatorName = currentUser?.name?.ifBlank { "Vaulta User" } ?: "Vaulta User",
+                        creatorContact = currentUser?.email?.ifBlank { currentUser.phoneNumber },
+                        counterpartyId = null,
+                        counterpartyName = expense.title,
+                        counterpartyContact = counterpartyContact,
+                        direction = if (isOwedToUser) "OWED_TO_CREATOR" else "CREATOR_OWES",
+                        status = "PENDING",
+                        timestamp = Utils.getMillisFromDate(expense.date),
+                        notes = expense.note
+                    )
+                    expenseRepository.insertSharedSplit(splitEntity)
+                }
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Credit/Owe record saved",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun settleSharedSplit(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.settleSharedSplit(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Split settled successfully",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
+
+    fun deleteSharedSplit(id: String) {
+        viewModelScope.launch {
+            val success = expenseRepository.deleteSharedSplit(id)
+            if (success) {
+                com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                    message = "Split entry removed",
+                    durationMs = 3000L
+                )
+            }
+        }
+    }
 
     fun getCurrentMonthSpends(list: List<ExpenseEntity>): Double {
         return budgetRepository.calculateCurrentMonthSpends(list)

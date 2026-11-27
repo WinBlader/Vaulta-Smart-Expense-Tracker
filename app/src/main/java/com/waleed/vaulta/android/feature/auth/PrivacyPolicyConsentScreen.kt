@@ -293,7 +293,7 @@ fun PrivacyPolicyConsentScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
             PolicySubheading(title = "B. Financial & Expense Data")
-            PolicyBodyText(text = "• Transaction Records: Titles, amounts, categories, dates, types (Expense, Income, Credit, Owe), and optional transaction notes.\n• Budget Settings: Monthly budget caps and spending limits.\n• Storage: By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend so you can access it across devices.")
+            PolicyBodyText(text = "• Transaction Records: Titles, amounts, categories, dates, types (Expense, Income, Credit, Owe), and optional transaction notes.\n• Budget Settings: Monthly budget caps and spending limits.\n• Shared Splits & Universal Ledger: Group expense splits and bilateral credit/owe entries created by you or shared with your contact identifier (email or phone). Participants are entered manually without accessing your address book or device contacts.\n• Storage: By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend so you can access it across devices.")
 
             Spacer(modifier = Modifier.height(12.dp))
             PolicySubheading(title = "C. Device Permissions & Services")

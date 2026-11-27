@@ -1,0 +1,480 @@
+package com.waleed.vaulta.android.feature.home
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.waleed.vaulta.android.R
+import com.waleed.vaulta.android.data.CurrencyManager
+import com.waleed.vaulta.android.data.model.ExpenseEntity
+import com.waleed.vaulta.android.data.model.SharedSplitEntity
+import com.waleed.vaulta.android.utils.Utils
+import java.util.UUID
+
+data class SplitParticipant(
+    val name: String = "",
+    val contact: String = "",
+    val customAmount: String = ""
+)
+
+@Composable
+fun SplitBillDialog(
+    currentUserId: String,
+    currentUserName: String,
+    currentUserContact: String,
+    onDismiss: () -> Unit,
+    onSaveSplits: (List<SharedSplitEntity>, ExpenseEntity?) -> Unit
+) {
+    val context = LocalContext.current
+    val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
+
+    var title by remember { mutableStateOf("") }
+    var totalAmountInput by remember { mutableStateOf("") }
+    var isEqualSplit by remember { mutableStateOf(true) }
+    var includeCreator by remember { mutableStateOf(true) }
+    var notes by remember { mutableStateOf("") }
+
+    // List of other participants
+    var participants by remember {
+        mutableStateOf(listOf(SplitParticipant(), SplitParticipant()))
+    }
+
+    val totalAmount = totalAmountInput.toDoubleOrNull() ?: 0.0
+
+    // Equal mode share calculation
+    val totalPeople = participants.size + (if (includeCreator) 1 else 0)
+    val equalSharePerPerson = if (totalPeople > 0 && totalAmount > 0) totalAmount / totalPeople else 0.0
+
+    // Custom mode total sum check
+    val participantsCustomSum = participants.sumOf { it.customAmount.toDoubleOrNull() ?: 0.0 }
+    val creatorCustomShare = if (includeCreator) (totalAmount - participantsCustomSum).coerceAtLeast(0.0) else 0.0
+
+    val isCustomBalanced = if (isEqualSplit) {
+        totalAmount > 0
+    } else {
+        totalAmount > 0 && Math.abs(participantsCustomSum + (if (includeCreator) creatorCustomShare else 0.0) - totalAmount) < 0.01
+    }
+
+    val isValid = title.isNotBlank() &&
+            totalAmount > 0 &&
+            participants.isNotEmpty() &&
+            participants.all { it.name.isNotBlank() } &&
+            isCustomBalanced
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f)
+                .padding(vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(Color(0xFF6366F1), shape = RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_credit_owe),
+                            contentDescription = "Split Bill",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Split Bill",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Split group expense & sync with members",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Scrollable content
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Title input
+                    item {
+                        OutlinedTextField(
+                            value = title,
+                            onValueChange = { title = it },
+                            label = { Text("Bill / Event Title") },
+                            placeholder = { Text("e.g. Dinner at Olive, Goa Trip") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    // Total Amount input
+                    item {
+                        OutlinedTextField(
+                            value = totalAmountInput,
+                            onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) totalAmountInput = it },
+                            label = { Text("Total Bill Amount (${currentCurrency.symbol})") },
+                            placeholder = { Text("0.00") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    // Split Mode Selector: Equal vs Custom
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isEqualSplit) Color(0xFF6366F1) else Color.Transparent)
+                                    .clickable { isEqualSplit = true }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Equal Split",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isEqualSplit) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (!isEqualSplit) Color(0xFF6366F1) else Color.Transparent)
+                                    .clickable { isEqualSplit = false }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Custom Split",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!isEqualSplit) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Include Creator's Share Toggle
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Include my share in bill",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (includeCreator) {
+                                            val share = if (isEqualSplit) equalSharePerPerson else creatorCustomShare
+                                            "Your personal expense: ${Utils.formatCurrency(share, currentCurrency)}"
+                                        } else {
+                                            "You paid on behalf of others only"
+                                        },
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = includeCreator,
+                                    onCheckedChange = { includeCreator = it }
+                                )
+                            }
+                        }
+                    }
+
+                    // Participants Header & Add Button
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Participants (${participants.size})",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            TextButton(
+                                onClick = {
+                                    participants = participants + SplitParticipant()
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add Person", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    // List of Participants
+                    itemsIndexed(participants) { index, participant ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Person ${index + 1}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6366F1)
+                                    )
+                                    if (participants.size > 1) {
+                                        IconButton(
+                                            onClick = {
+                                                participants = participants.toMutableList().also { it.removeAt(index) }
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Remove",
+                                                tint = Color.Red.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                OutlinedTextField(
+                                    value = participant.name,
+                                    onValueChange = { newName ->
+                                        participants = participants.toMutableList().also {
+                                            it[index] = it[index].copy(name = newName)
+                                        }
+                                    },
+                                    label = { Text("Name (Required)") },
+                                    placeholder = { Text("e.g. Sarah, Bob") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                OutlinedTextField(
+                                    value = participant.contact,
+                                    onValueChange = { newContact ->
+                                        participants = participants.toMutableList().also {
+                                            it[index] = it[index].copy(contact = newContact)
+                                        }
+                                    },
+                                    label = { Text("Email or Phone (Optional for Sync)") },
+                                    placeholder = { Text("bob@example.com or +1234567890") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                if (isEqualSplit) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Share: ${Utils.formatCurrency(equalSharePerPerson, currentCurrency)}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    OutlinedTextField(
+                                        value = participant.customAmount,
+                                        onValueChange = { newAmt ->
+                                            if (newAmt.all { c -> c.isDigit() || c == '.' }) {
+                                                participants = participants.toMutableList().also {
+                                                    it[index] = it[index].copy(customAmount = newAmt)
+                                                }
+                                            }
+                                        },
+                                        label = { Text("Their Share (${currentCurrency.symbol})") },
+                                        placeholder = { Text("0.00") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Optional Notes
+                    item {
+                        OutlinedTextField(
+                            value = notes,
+                            onValueChange = { notes = it },
+                            label = { Text("Notes (Optional)") },
+                            placeholder = { Text("Add payment or split details") },
+                            maxLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (isValid) {
+                                val groupId = UUID.randomUUID().toString()
+                                val now = System.currentTimeMillis()
+
+                                val splitEntities = participants.map { p ->
+                                    val splitAmt = if (isEqualSplit) {
+                                        equalSharePerPerson
+                                    } else {
+                                        p.customAmount.toDoubleOrNull() ?: 0.0
+                                    }
+
+                                    SharedSplitEntity(
+                                        id = UUID.randomUUID().toString(),
+                                        groupId = groupId,
+                                        title = title.trim(),
+                                        totalAmount = totalAmount,
+                                        splitAmount = splitAmt,
+                                        creatorId = currentUserId,
+                                        creatorName = currentUserName,
+                                        creatorContact = currentUserContact.ifBlank { null },
+                                        counterpartyId = null,
+                                        counterpartyName = p.name.trim(),
+                                        counterpartyContact = p.contact.trim().ifBlank { null },
+                                        direction = "OWED_TO_CREATOR",
+                                        status = "PENDING",
+                                        timestamp = now,
+                                        notes = notes.trim().ifBlank { null }
+                                    )
+                                }
+
+                                val creatorExpense = if (includeCreator) {
+                                    val creatorShare = if (isEqualSplit) equalSharePerPerson else creatorCustomShare
+                                    if (creatorShare > 0) {
+                                        ExpenseEntity(
+                                            id = null,
+                                            title = "${title.trim()} (My Share)",
+                                            amount = creatorShare,
+                                            date = Utils.formatDateToHumanReadableForm(now),
+                                            type = "Expense",
+                                            userId = currentUserId,
+                                            note = "Split bill: ${title.trim()}"
+                                        )
+                                    } else null
+                                } else null
+
+                                onSaveSplits(splitEntities, creatorExpense)
+                            }
+                        },
+                        enabled = isValid,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Split & Save", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}

@@ -61,6 +61,15 @@ class AutoDetectTransactionIntegrationTest {
         override suspend fun clearCurrentUserData() {
             listFlow.value = emptyList()
         }
+
+        private val sharedSplitsFlow = MutableStateFlow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>>(emptyList())
+        override fun getAllSharedSplits(): Flow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>> = sharedSplitsFlow
+        override suspend fun insertSharedSplit(split: com.waleed.vaulta.android.data.model.SharedSplitEntity): Boolean = true
+        override suspend fun insertSharedSplits(splits: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>): Boolean = true
+        override suspend fun updateSharedSplit(split: com.waleed.vaulta.android.data.model.SharedSplitEntity): Boolean = true
+        override suspend fun settleSharedSplit(id: String): Boolean = true
+        override suspend fun deleteSharedSplit(id: String): Boolean = true
+        override suspend fun syncSharedSplits() {}
     }
 
     @Test

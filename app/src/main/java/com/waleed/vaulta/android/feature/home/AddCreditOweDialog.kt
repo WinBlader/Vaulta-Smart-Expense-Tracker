@@ -29,7 +29,7 @@ import java.util.Calendar
 @Composable
 fun AddCreditOweDialog(
     onDismiss: () -> Unit,
-    onSave: (ExpenseEntity) -> Unit
+    onSave: (ExpenseEntity, String?) -> Unit
 ) {
     val context = LocalContext.current
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
@@ -37,6 +37,7 @@ fun AddCreditOweDialog(
     // Direction: true = Someone Owes You (Credit/Income), false = You Owe Someone (Debit/Debt)
     var isSomeoneOwesYou by remember { mutableStateOf(true) }
     var personName by remember { mutableStateOf("") }
+    var personContact by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(System.currentTimeMillis()) }
     var note by remember { mutableStateOf("") }
@@ -152,6 +153,19 @@ fun AddCreditOweDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Person Contact (Optional for sync)
+                OutlinedTextField(
+                    value = personContact,
+                    onValueChange = { personContact = it },
+                    label = { Text("Email or Phone (Optional for Sync)") },
+                    placeholder = { Text("john@example.com or +1234567890") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 // Amount Field
                 OutlinedTextField(
                     value = amount,
@@ -230,7 +244,7 @@ fun AddCreditOweDialog(
                                     type = typeStr,
                                     note = note.trim().ifBlank { null }
                                 )
-                                onSave(entity)
+                                onSave(entity, personContact.trim().ifBlank { null })
                             }
                         },
                         enabled = personName.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0,

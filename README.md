@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.4.9%20(Build%2017)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.4.9"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.0%20(Build%2018)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.0"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -42,9 +42,18 @@
 
 ## ✨ Key Features 
 
-### 1. 💸 Expense & Income Tracking + Credit & Owe Management
+### 1. 💸 Expense & Income Tracking + Split Bill & Universal Shared Ledger (v1.5.0)
 - **Fast Transaction Logging:** Dedicated, distraction-free entry layouts optimized separately for income streams, expenses, and Credit/Owe obligations.
-- **Credit & Owe FAB Action:** Expandable FAB features a vibrant Amber/Yellow action allowing you to log whether someone owes you money (Credit / Balance `+`) or you owe someone (Owe / Balance `-`).
+- **Split Bill (Splitwise-Style Group Splitter):** Dedicated Indigo FAB action allowing you to split group bills (e.g., dinners, shared trips, apartment rent) between multiple participants.
+  - Supports **Equal Split** (automatic even distribution among all participants) and **Custom Split** (per-person custom amounts with live total validation).
+  - **Include My Share in Bill:** Toggle whether the creator's personal portion is logged as a personal Expense while other shares are tracked as obligations owed to you.
+  - **Participant Management:** Add multiple members with required Name and optional Email/Phone for universal cross-account sync without requiring device Contacts permissions.
+- **Universal Shared Credit/Owe Ledger:**
+  - View cross-account shared splits and bilateral Credit/Owe obligations in the full Transaction List screen under the **Shared Splits** filter chip.
+  - **Perspective-Aware Rendering:** Dynamically detects whether you created the split or are a participant (via contact matching), cleanly indicating who owes whom (e.g., *"Alex owes you"* vs *"You owe Sarah"*).
+  - **Sync & Settlement Status Chips:** Displays real-time status chips for `"Synced"` (cloud-backed) / `"Local"` and `"Pending"` / `"Settled"`.
+  - **Settle Up Action:** Mark obligations as settled with one tap, instantly updating locally and across Supabase cloud.
+- **Credit & Owe FAB Action:** Expandable FAB features a vibrant Amber/Yellow action allowing you to log whether someone owes you money (Credit / Balance `+`) or you owe someone (Owe / Balance `-`) with optional contact details for cross-device cloud sync.
 - **Optional Transaction Notes:** Add optional descriptive notes to any transaction during creation, edit existing transactions with notes, and view notes in receipts and transaction histories.
 - **Custom Notes & Titles:** Tap the ✏️ pencil tool to record custom merchant or project titles (e.g., *"Freelance Retainer"*, *"Farmers Market"*) while retaining primary category tags.
 - **Rich Category Presets:**

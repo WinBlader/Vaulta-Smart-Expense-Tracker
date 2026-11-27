@@ -18,8 +18,9 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 
 ### B. Financial & Expense Data
 - **Transaction & Credit/Owe Records:** Titles, amounts, categories, dates, transaction types (Expense, Income, Owed to You, or You Owe), payment methods, and optional transaction notes.
+- **Shared Splits & Universal Ledger:** Group expense bill splits and bilateral credit/owe ledger entries created by you or shared with your contact identifier (email or phone). Participants are entered manually without accessing your device address book.
 - **Budget & Regional Preferences:** Monthly budget caps, spending limits, and selected currency preference (`currency_code`).
-- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, notes, monthly budget, and currency preference synchronize with our secure backend protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
+- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, shared splits, notes, monthly budget, and currency preference synchronize with our secure backend protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.

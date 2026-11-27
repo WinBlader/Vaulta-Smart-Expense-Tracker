@@ -121,14 +121,31 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     val greetingName = userState?.name?.ifEmpty { "User" } ?: "User"
     var showFeedbackDialog by remember { mutableStateOf(false) }
     var showAddCreditOweDialog by remember { mutableStateOf(false) }
+    var showSplitBillDialog by remember { mutableStateOf(false) }
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
 
     if (showAddCreditOweDialog) {
         AddCreditOweDialog(
             onDismiss = { showAddCreditOweDialog = false },
-            onSave = {
-                viewModel.insertExpense(it)
+            onSave = { entity, contact ->
+                viewModel.saveCreditOwe(entity, contact)
                 showAddCreditOweDialog = false
+            }
+        )
+    }
+
+    if (showSplitBillDialog) {
+        val userKey = userState?.id?.ifBlank { "guest" } ?: "guest"
+        val userName = userState?.name?.ifBlank { "You" } ?: "You"
+        val userContact = userState?.email?.ifBlank { userState?.phoneNumber ?: "" } ?: ""
+        SplitBillDialog(
+            currentUserId = userKey,
+            currentUserName = userName,
+            currentUserContact = userContact,
+            onDismiss = { showSplitBillDialog = false },
+            onSaveSplits = { splits, creatorExp ->
+                viewModel.insertSharedSplits(splits, creatorExp)
+                showSplitBillDialog = false
             }
         )
     }
@@ -322,6 +339,9 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                     },
                     onAddCreditOweClicked = {
                         showAddCreditOweDialog = true
+                    },
+                    onSplitBillClicked = {
+                        showSplitBillDialog = true
                     }
                 )
             }
@@ -334,7 +354,8 @@ fun MultiFloatingActionButton(
     modifier: Modifier,
     onAddExpenseClicked: () -> Unit,
     onAddIncomeClicked: () -> Unit,
-    onAddCreditOweClicked: () -> Unit
+    onAddCreditOweClicked: () -> Unit,
+    onSplitBillClicked: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -346,6 +367,25 @@ fun MultiFloatingActionButton(
             // Secondary FABs
             AnimatedVisibility(visible = expanded) {
                 Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(16.dp)) {
+                    // Split Bill FAB (Indigo)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(color = Color(0xFF6366F1), shape = RoundedCornerShape(12.dp))
+                            .clickable {
+                                expanded = false
+                                onSplitBillClicked.invoke()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_credit_owe),
+                            contentDescription = "Split Bill",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                     // Credit / Owe FAB (Yellow)
                     Box(
                         modifier = Modifier

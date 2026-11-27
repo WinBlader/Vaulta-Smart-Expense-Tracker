@@ -7,15 +7,18 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.waleed.vaulta.android.data.dao.ExpenseDao
+import com.waleed.vaulta.android.data.dao.SharedSplitDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
+import com.waleed.vaulta.android.data.model.SharedSplitEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
-@Database(entities = [ExpenseEntity::class], version = 5, exportSchema = false)
+@Database(entities = [ExpenseEntity::class, SharedSplitEntity::class], version = 6, exportSchema = false)
 @Singleton
 abstract class ExpenseDatabase : RoomDatabase() {
 
     abstract fun expenseDao(): ExpenseDao
+    abstract fun sharedSplitDao(): SharedSplitDao
 
     companion object {
         const val DATABASE_NAME = "expense_database"
@@ -30,8 +33,7 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     ExpenseDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance
@@ -85,5 +87,31 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("ALTER TABLE expense_table ADD COLUMN uuid TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS shared_splits (
+                id TEXT NOT NULL PRIMARY KEY,
+                groupId TEXT,
+                title TEXT NOT NULL,
+                totalAmount REAL NOT NULL,
+                splitAmount REAL NOT NULL,
+                creatorId TEXT NOT NULL,
+                creatorName TEXT NOT NULL,
+                creatorContact TEXT,
+                counterpartyId TEXT,
+                counterpartyName TEXT NOT NULL,
+                counterpartyContact TEXT,
+                direction TEXT NOT NULL,
+                status TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                notes TEXT
+            )
+            """.trimIndent()
+        )
     }
 }
