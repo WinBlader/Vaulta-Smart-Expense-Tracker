@@ -8,17 +8,20 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.dao.SharedSplitDao
+import com.waleed.vaulta.android.data.dao.UserBalanceDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.SharedSplitEntity
+import com.waleed.vaulta.android.data.model.UserBalanceEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
-@Database(entities = [ExpenseEntity::class, SharedSplitEntity::class], version = 6, exportSchema = false)
+@Database(entities = [ExpenseEntity::class, SharedSplitEntity::class, UserBalanceEntity::class], version = 7, exportSchema = false)
 @Singleton
 abstract class ExpenseDatabase : RoomDatabase() {
 
     abstract fun expenseDao(): ExpenseDao
     abstract fun sharedSplitDao(): SharedSplitDao
+    abstract fun userBalanceDao(): UserBalanceDao
 
     companion object {
         const val DATABASE_NAME = "expense_database"
@@ -33,7 +36,7 @@ abstract class ExpenseDatabase : RoomDatabase() {
                     ExpenseDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance
@@ -110,6 +113,21 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
                 status TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 notes TEXT
+            )
+            """.trimIndent()
+        )
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS user_balance (
+                userId TEXT NOT NULL PRIMARY KEY,
+                initialBalance REAL NOT NULL DEFAULT 0.0,
+                currentBalance REAL NOT NULL DEFAULT 0.0,
+                updatedAt INTEGER NOT NULL
             )
             """.trimIndent()
         )

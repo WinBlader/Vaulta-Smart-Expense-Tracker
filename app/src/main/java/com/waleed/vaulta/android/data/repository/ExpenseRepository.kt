@@ -7,12 +7,14 @@ import com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider
 import com.waleed.vaulta.android.data.budget.BudgetManager
 import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.dao.SharedSplitDao
+import com.waleed.vaulta.android.data.dao.UserBalanceDao
 import com.waleed.vaulta.android.data.model.ExpenseEntity
 import com.waleed.vaulta.android.data.model.ExpenseSummary
 import com.waleed.vaulta.android.data.model.ProfileDto
 import com.waleed.vaulta.android.data.model.RemoteTransactionDto
 import com.waleed.vaulta.android.data.model.SharedSplitDto
 import com.waleed.vaulta.android.data.model.SharedSplitEntity
+import com.waleed.vaulta.android.data.model.UserBalanceEntity
 import com.waleed.vaulta.android.data.session.UserSessionManager
 import com.waleed.vaulta.android.data.sync.CloudSyncWorker
 import com.waleed.vaulta.android.utils.Utils
@@ -43,6 +45,11 @@ interface ExpenseRepository {
     suspend fun syncAllCloudData(userId: String)
     suspend fun clearCurrentUserData()
 
+    // User Balance Persistence
+    fun observeUserBalance(userId: String): Flow<UserBalanceEntity?>
+    suspend fun getUserBalance(userId: String): UserBalanceEntity?
+    suspend fun recomputeAndPersistBalance(userId: String? = null)
+
     // Shared Splits & Universal Ledger
     fun getAllSharedSplits(): Flow<List<SharedSplitEntity>>
     suspend fun insertSharedSplit(split: SharedSplitEntity): Boolean
@@ -58,6 +65,7 @@ interface ExpenseRepository {
 class ExpenseRepositoryImpl @Inject constructor(
     private val dao: ExpenseDao,
     private val sharedSplitDao: SharedSplitDao,
+    private val userBalanceDao: UserBalanceDao,
     private val budgetManager: BudgetManager,
     private val sessionManager: UserSessionManager,
     @ApplicationContext private val context: Context? = null
@@ -149,6 +157,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
+            recomputeAndPersistBalance(resolvedUserId)
 
             // Asynchronously sync to Supabase if authenticated (skip guest)
             pushTransactionToCloud(toSave)
@@ -176,6 +185,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
+            recomputeAndPersistBalance(resolvedUserId)
 
             pushTransactionToCloud(toSave)
             true
@@ -216,6 +226,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             val updated = dao.getAllExpenseForUser(userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
             budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
+            recomputeAndPersistBalance(userKey)
             true
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Failed deleting expense: ${e.message}", e)
@@ -325,6 +336,17 @@ class ExpenseRepositoryImpl @Inject constructor(
                     if (restoredInitialBalance != 0.0 || sessionManager.getInitialBalance(effectiveUserId) == 0.0) {
                         sessionManager.setInitialBalance(restoredInitialBalance, effectiveUserId)
                     }
+
+                    // Restore or initialize local UserBalanceEntity
+                    val restoredCurrentBalance = remoteProfile.currentBalance ?: restoredInitialBalance
+                    userBalanceDao.upsert(
+                        UserBalanceEntity(
+                            userId = effectiveUserId,
+                            initialBalance = restoredInitialBalance,
+                            currentBalance = restoredCurrentBalance,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
 
                     if (remoteProfile.privacyPolicyAccepted == true) {
                         sessionManager.setPrivacyPolicyAccepted(true, effectiveUserId)
@@ -440,6 +462,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                 val finalLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
                 budgetManager.checkBudgetAndNotify(finalLocalList)
                 budgetManager.checkBalanceAndNotify(finalLocalList)
+                recomputeAndPersistBalance(effectiveUserId)
 
                 // 4d. Reinstall Hydration & Sync: Shared Splits & Universal Ledger
                 syncSharedSplitsInternal(effectiveUserId, authUid, fallbackEmail, currentUser?.phoneNumber ?: "")
@@ -521,6 +544,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             val userKey = sessionManager.getCurrentUserKey()
             dao.deleteExpensesForUser(userKey)
             sharedSplitDao.deleteSharedSplitsForUser(userKey)
+            userBalanceDao.deleteForUser(userKey)
             budgetManager.resetBudgetForUser(userKey)
             sessionManager.setInitialBalance(0.0, userKey)
 
@@ -535,8 +559,8 @@ class ExpenseRepositoryImpl @Inject constructor(
                                 eq("user_id", authUid)
                             }
                         }
-                        // 2. Reset monthly_budget = 0.0 and initial_balance = 0.0 in public.profiles
-                        client.from("profiles").update(mapOf("monthly_budget" to 0.0, "initial_balance" to 0.0)) {
+                        // 2. Reset monthly_budget = 0.0, initial_balance = 0.0, current_balance = 0.0 in public.profiles
+                        client.from("profiles").update(mapOf("monthly_budget" to 0.0, "initial_balance" to 0.0, "current_balance" to 0.0)) {
                             filter {
                                 eq("id", authUid)
                             }
@@ -553,6 +577,65 @@ class ExpenseRepositoryImpl @Inject constructor(
             Log.e("VaultaCloudSync", "Notice during clearCurrentUserData: ${e.message}", e)
         }
         Unit
+    }
+
+    // ==========================================
+    // User Balance Persistence Implementation
+    // ==========================================
+
+    override fun observeUserBalance(userId: String): Flow<UserBalanceEntity?> {
+        return userBalanceDao.observeBalance(userId)
+    }
+
+    override suspend fun getUserBalance(userId: String): UserBalanceEntity? {
+        return userBalanceDao.getBalance(userId)
+    }
+
+    override suspend fun recomputeAndPersistBalance(userId: String?): Unit = withContext(Dispatchers.IO) {
+        try {
+            val userKey = userId?.ifBlank { null } ?: sessionManager.getCurrentUserKey()
+            val initialBalance = sessionManager.getInitialBalance(userKey)
+
+            val expenses = dao.getExpensesListForUser(userKey, "")
+            var netTransactions = 0.0
+            for (expense in expenses) {
+                when (expense.type) {
+                    "Income", "Owed to You", "Credit" -> netTransactions += expense.amount
+                    else -> netTransactions -= expense.amount
+                }
+            }
+            val liveCurrentBalance = initialBalance + netTransactions
+            val balanceEntity = UserBalanceEntity(
+                userId = userKey,
+                initialBalance = initialBalance,
+                currentBalance = liveCurrentBalance,
+                updatedAt = System.currentTimeMillis()
+            )
+            userBalanceDao.upsert(balanceEntity)
+
+            // If userKey is authenticated, push updated balances to Supabase public.profiles
+            if (SupabaseClientProvider.isConfigured() && userKey != "guest" && userKey.isNotBlank()) {
+                val authUid = ensureAuthenticatedSession()
+                if (!authUid.isNullOrBlank()) {
+                    try {
+                        SupabaseClientProvider.client.from("profiles").update(
+                            mapOf(
+                                "initial_balance" to initialBalance,
+                                "current_balance" to liveCurrentBalance
+                            )
+                        ) {
+                            filter {
+                                eq("id", authUid)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w("VaultaCloudSync", "Notice updating balance in cloud: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("VaultaCloudSync", "Error recomputing user balance: ${e.message}", e)
+        }
     }
 
     // ==========================================

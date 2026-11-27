@@ -62,6 +62,11 @@ class AutoDetectTransactionIntegrationTest {
             listFlow.value = emptyList()
         }
 
+        private val userBalanceFlow = MutableStateFlow<com.waleed.vaulta.android.data.model.UserBalanceEntity?>(null)
+        override fun observeUserBalance(userId: String): Flow<com.waleed.vaulta.android.data.model.UserBalanceEntity?> = userBalanceFlow
+        override suspend fun getUserBalance(userId: String): com.waleed.vaulta.android.data.model.UserBalanceEntity? = userBalanceFlow.value
+        override suspend fun recomputeAndPersistBalance(userId: String?) {}
+
         private val sharedSplitsFlow = MutableStateFlow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>>(emptyList())
         override fun getAllSharedSplits(): Flow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>> = sharedSplitsFlow
         override suspend fun insertSharedSplit(split: com.waleed.vaulta.android.data.model.SharedSplitEntity): Boolean = true

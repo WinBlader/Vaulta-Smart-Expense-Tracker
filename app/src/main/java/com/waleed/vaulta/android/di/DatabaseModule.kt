@@ -4,6 +4,7 @@ import android.content.Context
 import com.waleed.vaulta.android.data.ExpenseDatabase
 import com.waleed.vaulta.android.data.dao.ExpenseDao
 import com.waleed.vaulta.android.data.dao.SharedSplitDao
+import com.waleed.vaulta.android.data.dao.UserBalanceDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,5 +30,10 @@ object DatabaseModule {
     @Provides
     fun provideSharedSplitDao(database: ExpenseDatabase): SharedSplitDao {
         return database.sharedSplitDao()
+    }
+
+    @Provides
+    fun provideUserBalanceDao(database: ExpenseDatabase): UserBalanceDao {
+        return database.userBalanceDao()
     }
 }

@@ -235,7 +235,7 @@ fun PrivacyPolicyConsentScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Last updated: November 24th, 2026",
+                    text = "Last updated: November 27th, 2026",
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontFamily = InterFontFamily,
                         fontWeight = FontWeight.Medium,
@@ -293,7 +293,7 @@ fun PrivacyPolicyConsentScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
             PolicySubheading(title = "B. Financial & Expense Data")
-            PolicyBodyText(text = "• Transaction Records: Titles, amounts, categories, dates, types (Expense, Income, Credit, Owe), and optional transaction notes.\n• Budget Settings: Monthly budget caps and spending limits.\n• Shared Splits & Universal Ledger: Group expense splits and bilateral credit/owe entries created by you or shared with your contact identifier (email or phone). Participants are entered manually without accessing your address book or device contacts.\n• Storage: By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend so you can access it across devices.")
+            PolicyBodyText(text = "• Transaction Records: Titles, amounts, categories, dates, types (Expense, Income, Credit, Owe), and optional transaction notes.\n• Budget Settings: Monthly budget caps and spending limits.\n• Account, Budget & Balance Backup: Profile preferences—including currency, monthly budget limits, and user-set initial and current balance figures—are stored locally on your device in a secure SQLite database (Room) and, when signed in, synced to our secure backend for backup and cross-device restore. In Guest Mode, all balance and transaction data remains strictly on your device.\n• Shared Splits & Universal Ledger: Group expense splits and bilateral credit/owe entries created by you or shared with your contact identifier (email or phone). When you create a group bill split or Credit/Owe entry and optionally enter another participant's email address or phone number, that split record (title, split amount, settlement status, and participant identifier) is synced to our secure backend so both participants can view and settle the shared balance. Entries created without a linked email or phone number remain private to your own account and device. Participants are entered manually without accessing your address book or device contacts.\n• Storage: By default, all financial data is stored locally on your device in a secure SQLite database (Room). If logged in with an account, your data may be synced with our secure backend so you can access it across devices.")
 
             Spacer(modifier = Modifier.height(12.dp))
             PolicySubheading(title = "C. Device Permissions & Services")

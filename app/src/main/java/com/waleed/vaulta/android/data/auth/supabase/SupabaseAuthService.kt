@@ -975,6 +975,36 @@ class SupabaseAuthService @Inject constructor(
         }
     }
 
+    suspend fun updateBalancesCloud(initialBalance: Double, currentBalance: Double, userId: String? = null): Unit = withContext(Dispatchers.IO) {
+        if (!SupabaseClientProvider.isConfigured()) return@withContext
+        try {
+            ensureSessionInitialized()
+            val resolvedUserId = userId?.ifBlank { null }
+                ?: client.auth.currentUserOrNull()?.id
+                ?: sessionManager.currentUser.value?.id?.takeIf { it.isNotBlank() && it != "guest" }
+
+            if (!resolvedUserId.isNullOrBlank() && resolvedUserId != "guest") {
+                try {
+                    client.from("profiles").update(
+                        mapOf(
+                            "initial_balance" to initialBalance,
+                            "current_balance" to currentBalance
+                        )
+                    ) {
+                        filter {
+                            eq("id", resolvedUserId)
+                        }
+                    }
+                    Log.d(TAG, "Successfully updated balances (initial=$initialBalance, current=$currentBalance) in public.profiles for $resolvedUserId")
+                } catch (pe: Exception) {
+                    Log.w(TAG, "Notice updating balances in public.profiles: ${pe.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed updating balances in cloud: ${e.message}", e)
+        }
+    }
+
     private fun saveToSession(user: SupabaseUser) {
         sessionManager.saveUser(
             UserProfile(

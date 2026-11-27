@@ -1,6 +1,6 @@
 # Privacy Policy for Vaulta - Smart Expense Tracker
 
-**Last updated:** November 26th, 2026
+**Last updated:** November 27th, 2026
 
 **Vaulta - Smart Expense Tracker** ("Vaulta", "we", "us", or "our"), developed by winblader.org, respects your privacy and is committed to protecting the personal data of our users. This Privacy Policy explains how your information is collected, used, and stored when you use the Vaulta Android application (`com.waleed.vaulta.android`).
 
@@ -18,9 +18,10 @@ When you choose to register or sign in using Email or Google Sign-In, we collect
 
 ### B. Financial & Expense Data
 - **Transaction & Credit/Owe Records:** Titles, amounts, categories, dates, transaction types (Expense, Income, Owed to You, or You Owe), payment methods, and optional transaction notes.
-- **Shared Splits & Universal Ledger:** Group expense bill splits and bilateral credit/owe ledger entries created by you or shared with your contact identifier (email or phone). Participants are entered manually without accessing your device address book.
+- **Account, Budget & Balance Backup:** Profile preferences—including currency, monthly budget limits, and user-set initial and current balance figures—are stored locally on your device in a secure SQLite database (Room) and, when signed in, synced to our secure backend for backup and cross-device restore. In Guest Mode, all balance and transaction data remains strictly on your device.
+- **Shared Splits & Universal Ledger:** When you create a group bill split or Credit/Owe entry and optionally enter another participant's email address or phone number, that split record (title, split amount, settlement status, and participant identifier) is synced to our secure backend so both participants can view and settle the shared balance. Entries created without a linked email or phone number remain private to your own account and device. Participants are entered manually without accessing your device address book.
 - **Budget & Regional Preferences:** Monthly budget caps, spending limits, and selected currency preference (`currency_code`).
-- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, shared splits, notes, monthly budget, and currency preference synchronize with our secure backend protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
+- **Storage & Cloud Backup:** By default, all financial data is stored locally on your device in a secure SQLite database (Room). When signed in with an authenticated account, your profile, transaction records, Credit/Owe obligations, shared splits, notes, monthly budget, balances, and currency preference synchronize with our secure backend protected by Row-Level Security (`auth.uid() = user_id`) so your data is preserved across app uninstalls, device switches, and reinstalls.
 
 ### C. Device Permissions & Services
 - **Notifications (`POST_NOTIFICATIONS`):** Used to alert you when your spending approaches or exceeds budget limits, when your account balance falls below zero, and to confirm automatically logged transactions when Auto-Detect is enabled. We do not send marketing notifications.

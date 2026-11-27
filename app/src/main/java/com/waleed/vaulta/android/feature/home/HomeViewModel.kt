@@ -227,7 +227,8 @@ class HomeViewModel @Inject constructor(
         sessionManager.setInitialBalance(newInitialBalance, userKey)
         viewModelScope.launch {
             try {
-                supabaseAuthService.updateInitialBalanceCloud(newInitialBalance, userKey)
+                expenseRepository.recomputeAndPersistBalance(userKey)
+                supabaseAuthService.updateBalancesCloud(newInitialBalance, targetBalance, userKey)
             } catch (e: Exception) {
                 Log.w("HomeViewModel", "Notice syncing initial balance to cloud: ${e.message}")
             }
