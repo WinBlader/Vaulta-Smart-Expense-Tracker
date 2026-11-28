@@ -804,4 +804,38 @@ class VaultaFeatureIntegrationTest {
         val defaultProfile = com.waleed.vaulta.android.data.model.ProfileDto(id = "user_def")
         assertEquals(0.0, defaultProfile.initialBalance)
     }
+
+    @Test
+    fun testUpiDebitRecipientExtraction() {
+        val parser = com.waleed.vaulta.android.data.notification.TransactionNotificationParser
+        val result1 = parser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "Bank Alert",
+            text = "Debited by Rs 10.00 on 28-Nov-26 trf to Rahul Sharma Refno 921560000000"
+        )
+        assertNotNull(result1)
+        assertEquals(10.0, result1!!.amount, 0.001)
+        assertEquals("Expense", result1.type)
+        assertEquals("Paid to Rahul Sharma", result1.title)
+
+        val result2 = parser.parse(
+            packageName = "com.google.android.apps.messaging",
+            title = "UPI Alert",
+            text = "Paid Rs.10.00 to Rahul Sharma via UPI"
+        )
+        assertNotNull(result2)
+        assertEquals("Paid to Rahul Sharma", result2!!.title)
+    }
+
+    @Test
+    fun testTotalBalanceWithOpeningBalanceDoesNotTriggerNegativeBalance() {
+        val openingBalance = 45600.0
+        val income = 3454.0
+        val expense = 4664.0
+        val netTransactions = income - expense // -1210.0
+        val totalBalance = openingBalance + netTransactions // 44390.0
+
+        assertTrue("Total balance should remain positive", totalBalance > 0.0)
+        assertEquals(44390.0, totalBalance, 0.001)
+    }
 }

@@ -82,6 +82,8 @@ class AutoDetectTransactionIntegrationTest {
 
         private val creditOweFlow = MutableStateFlow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>>(emptyList())
         override fun getAllCreditOwe(): Flow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>> = creditOweFlow
+        override suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity? = null
+        override fun getUnifiedTransactions(): Flow<List<ExpenseEntity>> = listFlow
         override suspend fun insertCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean = true
         override suspend fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean = true
         override suspend fun settleCreditOwe(id: String): Boolean = true

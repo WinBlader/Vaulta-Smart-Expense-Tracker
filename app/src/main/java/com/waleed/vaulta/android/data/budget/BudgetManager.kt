@@ -22,7 +22,8 @@ import javax.inject.Singleton
 class BudgetManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val notificationHelper: BudgetNotificationHelper,
-    private val sessionManager: UserSessionManager
+    private val sessionManager: UserSessionManager,
+    private val alertThrottleManager: NotificationAlertManager
 ) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("vaulta_budget_prefs", Context.MODE_PRIVATE)
@@ -89,11 +90,16 @@ class BudgetManager @Inject constructor(
             .apply()
         _monthlyBudget.value = validAmount
 
+        val userKey = sessionManager.getCurrentUserKey()
+        val currentSpend = calculateCurrentMonthSpends(currentExpenses)
+        if (validAmount <= 0.0 || currentSpend <= validAmount) {
+            alertThrottleManager.resetBudgetExceededAlert(userKey)
+        }
+
         if (currentExpenses.isNotEmpty() && validAmount > 0.0) {
             checkBudgetAndNotify(currentExpenses)
         }
 
-        val userKey = sessionManager.getCurrentUserKey()
         if (userKey != "guest" && userKey.isNotBlank() && com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.isConfigured()) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -119,6 +125,7 @@ class BudgetManager @Inject constructor(
             .remove("budget_last_alert_month_$userKey")
             .remove("budget_last_negative_balance_notified_$userKey")
             .apply()
+        alertThrottleManager.clearForUser(userKey)
         _monthlyBudget.value = 0.0
 
         if (userKey != "guest" && userKey.isNotBlank() && com.waleed.vaulta.android.data.auth.supabase.SupabaseClientProvider.isConfigured()) {
@@ -179,16 +186,21 @@ class BudgetManager @Inject constructor(
         val lastLevel = getSavedAlertLevel()
 
         if (percent >= 100.0) {
-            if (lastLevel < 2) {
+            val userKey = sessionManager.getCurrentUserKey()
+            if (alertThrottleManager.shouldSendBudgetExceededAlert(userKey)) {
                 notificationHelper.sendBudgetExceededNotification(currentSpend, budget)
                 saveAlertLevel(2)
             }
         } else if (percent >= 80.0) {
+            val userKey = sessionManager.getCurrentUserKey()
+            alertThrottleManager.resetBudgetExceededAlert(userKey)
             if (lastLevel < 1) {
                 notificationHelper.sendBudgetWarningNotification(currentSpend, budget)
                 saveAlertLevel(1)
             }
         } else {
+            val userKey = sessionManager.getCurrentUserKey()
+            alertThrottleManager.resetBudgetExceededAlert(userKey)
             if (lastLevel != 0) {
                 saveAlertLevel(0)
             }
@@ -197,31 +209,38 @@ class BudgetManager @Inject constructor(
 
     /**
      * Checks if total balance is negative and sends a high-priority warning notification to the user.
+     * Takes calculated total balance (inclusive of openingBalance + transactions + credit/owe/splits),
+     * or computes it correctly using user's initial opening balance.
      */
-    fun checkBalanceAndNotify(expenses: List<ExpenseEntity>, forceNotifyIfNegative: Boolean = false) {
-        if (expenses.isEmpty()) return
-
+    fun checkBalanceAndNotify(
+        expenses: List<ExpenseEntity>,
+        computedTotalBalance: Double? = null,
+        forceNotifyIfNegative: Boolean = false
+    ) {
         var totalIncome = 0.0
         var totalExpense = 0.0
         for (expense in expenses) {
             when (expense.type) {
-                "Income", "Owed to You", "Credit" -> totalIncome += expense.amount
+                "Income" -> totalIncome += expense.amount
+                "Expense" -> totalExpense += expense.amount
+                "Owed to You", "Credit" -> totalIncome += expense.amount
                 else -> totalExpense += expense.amount
             }
         }
-        val currentBalance = totalIncome - totalExpense
-        val wasNegativeNotified = prefs.getBoolean(getNegativeNotifiedKey(), false)
+
+        val userKey = sessionManager.getCurrentUserKey()
+        val initialBalance = sessionManager.getInitialBalance(userKey)
+
+        // Single source of truth for totalBalance
+        val currentBalance = computedTotalBalance ?: (initialBalance + (totalIncome - totalExpense))
 
         if (currentBalance < 0.0) {
-            if (!wasNegativeNotified || forceNotifyIfNegative) {
+            if (alertThrottleManager.shouldSendNegativeBalanceAlert(userKey) || forceNotifyIfNegative) {
                 notificationHelper.sendNegativeBalanceNotification(currentBalance, totalIncome, totalExpense)
-                prefs.edit().putBoolean(getNegativeNotifiedKey(), true).apply()
             }
         } else {
-            // Balance recovered back to zero or positive, reset flag so user is notified if it drops again
-            if (wasNegativeNotified) {
-                prefs.edit().putBoolean(getNegativeNotifiedKey(), false).apply()
-            }
+            // Balance recovered back to zero or positive, reset throttle so future breaches alert again
+            alertThrottleManager.resetNegativeBalanceAlert(userKey)
         }
     }
 }

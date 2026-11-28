@@ -55,7 +55,7 @@ class TransactionListViewModel @Inject constructor(
     val currentUser = sessionManager.currentUser
 
     val uiState: StateFlow<TransactionListUiState> = combine(
-        expenseRepository.getAllExpenses(),
+        expenseRepository.getUnifiedTransactions(),
         expenseRepository.getAllSharedSplits(),
         expenseRepository.getAllCreditOwe(),
         _filterParams
@@ -248,6 +248,28 @@ class TransactionListViewModel @Inject constructor(
             }
             com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
                 message = "All splits in group settled",
+                durationMs = 3000L
+            )
+        }
+    }
+
+    suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity? {
+        return expenseRepository.getCreditOweById(id)
+    }
+
+    fun settleSplitCustom(splitsToSettle: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>, customAmounts: Map<String, Double>) {
+        viewModelScope.launch {
+            for (split in splitsToSettle) {
+                val customAmt = customAmounts[split.id]
+                if (customAmt != null && customAmt < split.splitAmount && customAmt > 0) {
+                    val remaining = split.splitAmount - customAmt
+                    expenseRepository.updateSharedSplit(split.copy(splitAmount = remaining))
+                } else {
+                    expenseRepository.settleSharedSplit(split.id)
+                }
+            }
+            com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                message = "Split settlement applied",
                 durationMs = 3000L
             )
         }

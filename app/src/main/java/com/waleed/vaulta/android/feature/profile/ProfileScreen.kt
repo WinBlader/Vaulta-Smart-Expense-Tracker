@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -591,45 +593,44 @@ fun ProfileScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            // Header with curved background and top bar actions inside scrollable hierarchy
+            // Compact curved top header with statusBarsPadding + 56.dp top bar + 24.dp curved bottom
             Box(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
+                    .background(Zinc)
+                    .statusBarsPadding()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_topbar),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
-                )
-
                 // Top bar header with Back button, Title and Edit action
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 54.dp, start = 16.dp, end = 16.dp)
+                        .height(56.dp)
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_back),
                         contentDescription = "Back",
                         modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .clickable { navController.popBackStack() }
+                            .size(24.dp)
+                            .clickable { navController.popBackStack() },
+                        colorFilter = ColorFilter.tint(Color.White)
                     )
                     ExpenseTextView(
                         text = "Profile",
                         style = Typography.titleLarge,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.Center)
+                        fontWeight = FontWeight.Bold
                     )
                     Row(
-                        modifier = Modifier.align(Alignment.CenterEnd),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.2f))
                                 .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
@@ -639,13 +640,13 @@ fun ProfileScreen(
                             Image(
                                 painter = painterResource(id = R.drawable.ic_edit),
                                 contentDescription = "Edit Profile",
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                                 colorFilter = ColorFilter.tint(Color.White)
                             )
                         }
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Red.copy(alpha = 0.35f))
                                 .border(1.5.dp, Red.copy(alpha = 0.7f), CircleShape)
@@ -655,12 +656,13 @@ fun ProfileScreen(
                             Image(
                                 painter = painterResource(id = R.drawable.ic_logout),
                                 contentDescription = "Log Out",
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(16.dp),
                                 colorFilter = ColorFilter.tint(Color.White)
                             )
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
             // Cards Content
@@ -668,9 +670,8 @@ fun ProfileScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
+                    .offset(y = (-16).dp)
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
                 // Header Profile Info Banner
                 Column(
                     modifier = Modifier

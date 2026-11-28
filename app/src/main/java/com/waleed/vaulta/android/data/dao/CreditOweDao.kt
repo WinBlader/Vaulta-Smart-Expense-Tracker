@@ -32,6 +32,9 @@ interface CreditOweDao {
     @Update
     suspend fun updateCreditOwe(entry: CreditOweEntity)
 
+    @Query("SELECT * FROM credit_owe WHERE id = :id LIMIT 1")
+    suspend fun getCreditOweById(id: String): CreditOweEntity?
+
     @Query("UPDATE credit_owe SET status = :status, settled_at = :settledAt WHERE id = :id")
     suspend fun updateStatus(id: String, status: String, settledAt: Long?)
 

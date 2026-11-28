@@ -15,7 +15,7 @@
   <a href="https://developer.android.com/training/data-storage/room"><img src="https://img.shields.io/badge/Room%20DB-v3%20(Offline--First)-3DDC84?style=for-the-badge&logo=sqlite&logoColor=white" alt="Room Database"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase%20Auth-3.0.0-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://developer.android.com/training/dependency-injection/hilt-android"><img src="https://img.shields.io/badge/Dagger%20Hilt-2.51-F44336?style=for-the-badge&logo=dagger&logoColor=white" alt="Dagger Hilt"/></a>
-  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.4%20(Build%2023)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.4"/></a>
+  <a href="https://developer.android.com/about/versions/14"><img src="https://img.shields.io/badge/Release-v1.5.5%20(Build%2024)-004D40?style=for-the-badge&logo=android&logoColor=white" alt="Release v1.5.5"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"/></a>
 </p>
 
@@ -42,7 +42,15 @@
 
 ## ✨ Key Features 
 
-### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Dedicated Credit/Owe (v1.5.4)
+### 1. 💸 Expense & Income Tracking + Split Bill, Universal Shared Ledger & Dedicated Credit/Owe (v1.5.5)
+- **3-Button Navigation Bar Inset Fix (v1.5.5):** Outer wrapper uses `Modifier.background(navBarColor).navigationBarsPadding()` with an inner fixed-height `Row(68.dp)`, ensuring navigation icons and active indicator pills maintain identical sizing, padding, and comfort across both 3-button system navigation and gesture navigation phones.
+- **Unified Total Balance & True Opening Balance Accounting (v1.5.5):** Centralized `totalBalance = openingBalance + totalIncome - totalExpense + netCreditOweAndSplitImpact` as single source of truth across `HomeViewModel`, `StatisticsViewModel`, and `BudgetManager`. Total Balance and negative-balance warning accurately account for configured starting balance, eliminating false alerts when accounts have positive net funds.
+- **2x 30-Second Notification Alert Throttling (v1.5.5):** `NotificationAlertManager` stateful throttle limits both Negative Balance and Monthly Budget Exceeded alerts to max 2 notifications separated by at least 30 seconds, automatically resetting when balance or budget recovers.
+- **Compact Profile Header Layout (v1.5.5):** Streamlined curved green header to sit compactly with `statusBarsPadding()`, `56.dp` top bar, and `24.dp` curve, eliminating the excessive empty gap above the user profile identity card.
+- **Statistics Swipe-to-Delete & Edit (v1.5.5):** Calibrated swipe threshold to `35%` across Expenses, Income, and Credit/Owe tabs for reliable delete confirmation dialog triggering, and added tap-to-edit support.
+- **Unified Home Transaction Feed & Direct Settle Up (v1.5.5):** Integrated `Credit / Owe` and `Split` entries into Recent Transactions and See All views with high-contrast badges, full swipe-to-delete, and quick `Settle Up` actions.
+- **Two-Option Split Settlement Dialog (v1.5.5):** Added `Settle All` (marks all pending shares settled and restores full balance) and `Custom` settlement (participant checklist + custom partial payment input) dialog.
+- **Smart UPI Debit Recipient Parsing (v1.5.5):** Enhanced regex pattern matching to extract recipient names from bank debit alerts (e.g., `"trf to Rahul Sharma Refno..."`) while discarding noise tokens (`UPI Transfer`, `IMPS`, `NEFT`, pure digits).
 - **Foreground Contact Picker & Window Trapping Fix (v1.5.4):** Contact Picker renders inside a dedicated foreground dialog (`DialogProperties(usePlatformDefaultWidth = false)`), resolving Compose window layering so the contact list is never trapped behind `Split Bill` or `Credit & Owe` dialogs.
 - **Direct Vaulta User Linking & Masked Contact Fix (v1.5.4):** Selecting a user from global user search directly binds their `counterpartyId` and displays a verified badge (`✓ Vaulta user linked`) without overwriting fields with masked strings (`rs***@gmail.com`) or triggering false `"Not registered yet"` warnings.
 - **Credit / Owe Statistics Tab Stability (v1.5.4):** Hardened chart coordinate math and `LazyColumn` item key uniqueness (using unique entity UUIDs for `credit_owe` and `shared_splits` rows) to prevent duplicate key crashes or chart division-by-zero on the Statistics screen.

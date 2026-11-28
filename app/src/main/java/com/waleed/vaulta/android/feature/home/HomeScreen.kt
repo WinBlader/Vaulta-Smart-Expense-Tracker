@@ -57,6 +57,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -130,6 +133,10 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
     var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
     var actionMenuItem by remember { mutableStateOf<ExpenseEntity?>(null) }
     var pendingDeleteExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var pendingSettleCreditOweId by remember { mutableStateOf<String?>(null) }
+    var pendingSettleSplitGroup by remember { mutableStateOf<Pair<String, List<com.waleed.vaulta.android.data.model.SharedSplitEntity>>?>(null) }
+    var editingCreditOweEntity by remember { mutableStateOf<com.waleed.vaulta.android.data.model.CreditOweEntity?>(null) }
+    val scope = rememberCoroutineScope()
 
     actionMenuItem?.let { item ->
         TransactionActionMenuBottomSheet(
@@ -210,7 +217,7 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
             confirmButton = {
                 Button(
                     onClick = {
-                        pendingDeleteExpense?.let { viewModel.deleteExpense(it) }
+                        pendingDeleteExpense?.let { viewModel.deleteItem(it) }
                         pendingDeleteExpense = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Red),
@@ -229,6 +236,97 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 ) {
                     Text(text = "Cancel", color = LightGrey)
                 }
+            }
+        )
+    }
+
+    if (pendingSettleCreditOweId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingSettleCreditOweId = null },
+            title = {
+                Text(
+                    text = "Settle Up Obligation?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF10B981)
+                )
+            },
+            text = {
+                Text(
+                    text = "Mark this credit/owe obligation as settled? This will update your total balance and sync to the cloud.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingSettleCreditOweId?.let { viewModel.settleCreditOwe(it) }
+                        pendingSettleCreditOweId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Settle Up",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingSettleCreditOweId = null }
+                ) {
+                    Text(text = "Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
+    pendingSettleSplitGroup?.let { (title, groupSplits) ->
+        SplitSettleUpDialog(
+            splitTitle = title,
+            totalBill = groupSplits.firstOrNull()?.totalAmount ?: 0.0,
+            pendingSplits = groupSplits,
+            onDismiss = { pendingSettleSplitGroup = null },
+            onSettleAll = {
+                val gid = groupSplits.firstOrNull()?.groupId
+                if (gid != null) {
+                    viewModel.settleAllInSplitGroup(gid)
+                } else {
+                    groupSplits.forEach { viewModel.settleSharedSplit(it.id) }
+                }
+                pendingSettleSplitGroup = null
+            },
+            onSettleCustom = { selected, customAmts ->
+                viewModel.settleSplitCustom(selected, customAmts)
+                pendingSettleSplitGroup = null
+            }
+        )
+    }
+
+    editingCreditOweEntity?.let { co ->
+        AddCreditOweDialog(
+            initialEntity = co,
+            onDismiss = { editingCreditOweEntity = null },
+            onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
+            onSearchUsers = { query -> viewModel.searchVaultaUsers(query) },
+            onSettle = {
+                viewModel.settleCreditOwe(co.id)
+                editingCreditOweEntity = null
+            },
+            onSave = { personName, amount, type, note, contact, counterpartyId ->
+                val updated = co.copy(
+                    personName = personName,
+                    amount = amount,
+                    type = type,
+                    note = note,
+                    counterpartyContact = contact,
+                    counterpartyId = counterpartyId
+                )
+                viewModel.updateCreditOwe(updated)
+                editingCreditOweEntity = null
             }
         )
     }
@@ -387,9 +485,51 @@ fun HomeScreen(navController: NavController, viewModel: HomeViewModel = hiltView
                 monthlyBudget = monthlyBudget,
                 onSetBudgetClicked = { showBudgetDialog = true },
                 onSpendsDashboardClicked = { viewModel.onEvent(HomeUiEvent.OnSpendsDashboardClicked) },
-                onItemClicked = { selectedItemForReceipt = it },
+                onItemClicked = { item ->
+                    if (item.uuid.startsWith("co_")) {
+                        val realId = item.uuid.removePrefix("co_")
+                        scope.launch {
+                            editingCreditOweEntity = viewModel.getCreditOweById(realId)
+                        }
+                    } else if (item.uuid.startsWith("sp_")) {
+                        val realId = item.uuid.removePrefix("sp_")
+                        scope.launch {
+                            val allSplits = viewModel.sharedSplits.first()
+                            val targetSplit = allSplits.firstOrNull { it.id == realId }
+                            val groupSplits = if (targetSplit?.groupId != null) {
+                                allSplits.filter { it.groupId == targetSplit.groupId && it.status.equals("PENDING", ignoreCase = true) }
+                            } else {
+                                listOfNotNull(targetSplit?.takeIf { it.status.equals("PENDING", ignoreCase = true) })
+                            }
+                            if (groupSplits.isNotEmpty()) {
+                                pendingSettleSplitGroup = Pair(targetSplit?.title ?: item.title, groupSplits)
+                            }
+                        }
+                    } else {
+                        selectedItemForReceipt = item
+                    }
+                },
                 onItemLongClicked = { actionMenuItem = it },
-                onDeleteClicked = { viewModel.deleteExpense(it) },
+                onDeleteClicked = { pendingDeleteExpense = it },
+                onSettleClicked = { item ->
+                    if (item.uuid.startsWith("co_")) {
+                        pendingSettleCreditOweId = item.uuid.removePrefix("co_")
+                    } else if (item.uuid.startsWith("sp_")) {
+                        val realId = item.uuid.removePrefix("sp_")
+                        scope.launch {
+                            val allSplits = viewModel.sharedSplits.first()
+                            val targetSplit = allSplits.firstOrNull { it.id == realId }
+                            val groupSplits = if (targetSplit?.groupId != null) {
+                                allSplits.filter { it.groupId == targetSplit.groupId && it.status.equals("PENDING", ignoreCase = true) }
+                            } else {
+                                listOfNotNull(targetSplit?.takeIf { it.status.equals("PENDING", ignoreCase = true) })
+                            }
+                            if (groupSplits.isNotEmpty()) {
+                                pendingSettleSplitGroup = Pair(targetSplit?.title ?: item.title, groupSplits)
+                            }
+                        }
+                    }
+                },
                 onSeeAllClicked = {
                     viewModel.onEvent(HomeUiEvent.OnSeeAllClicked)
                 }
@@ -625,6 +765,7 @@ fun TransactionList(
     onItemClicked: ((ExpenseEntity) -> Unit)? = null,
     onItemLongClicked: ((ExpenseEntity) -> Unit)? = null,
     onDeleteClicked: ((ExpenseEntity) -> Unit)? = null,
+    onSettleClicked: ((ExpenseEntity) -> Unit)? = null,
     onSeeAllClicked: () -> Unit
 ) {
     val currentCurrency = CurrencyManager.selectedCurrency.collectAsState().value
@@ -775,7 +916,7 @@ fun TransactionList(
                         false
                     } else false
                 },
-                positionalThreshold = { totalDistance -> totalDistance * 0.55f }
+                positionalThreshold = { totalDistance -> totalDistance * 0.35f }
             )
 
             SwipeToDismissBox(
@@ -809,12 +950,20 @@ fun TransactionList(
                         val icon = Utils.getItemIcon(item)
                         val isIncomeLike = item.type == "Income" || item.type == "Owed to You" || item.type == "Credit"
                         val isCreditOwe = item.type == "Owed to You" || item.type == "You Owe"
-                        val amount = if (isIncomeLike) item.amount else item.amount * -1
+                        val isSplit = item.type == "Split"
+                        val isSettled = item.note?.contains("[SETTLED]") == true
+                        val badge = when {
+                            isSplit -> "Split"
+                            isCreditOwe -> item.type
+                            else -> null
+                        }
                         val itemColor = when {
+                            isSplit -> Color(0xFF6366F1)
                             isCreditOwe -> Color(0xFFF59E0B)
                             isIncomeLike -> Green
                             else -> Red
                         }
+                        val amount = if (isIncomeLike) item.amount else item.amount * -1
 
                         Box(
                             modifier = Modifier
@@ -834,7 +983,9 @@ fun TransactionList(
                                 date = Utils.formatStringDateToMonthDayYear(item.date),
                                 color = itemColor,
                                 note = item.note,
-                                badgeText = if (isCreditOwe) item.type else null,
+                                badgeText = badge,
+                                showSettleUp = (isCreditOwe || isSplit) && !isSettled,
+                                onSettleUp = { onSettleClicked?.invoke(item) },
                                 modifier = Modifier
                             )
                         }
@@ -854,6 +1005,8 @@ fun TransactionItem(
     color: Color,
     note: String? = null,
     badgeText: String? = null,
+    showSettleUp: Boolean = false,
+    onSettleUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -884,14 +1037,20 @@ fun TransactionItem(
                 if (!badgeText.isNullOrBlank()) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Surface(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                        color = when (badgeText) {
+                            "Split" -> Color(0xFF6366F1).copy(alpha = 0.15f)
+                            else -> Color(0xFFF59E0B).copy(alpha = 0.15f)
+                        },
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
                             text = badgeText,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF59E0B),
+                            color = when (badgeText) {
+                                "Split" -> Color(0xFF6366F1)
+                                else -> Color(0xFFF59E0B)
+                            },
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
                     }
@@ -908,13 +1067,34 @@ fun TransactionItem(
                 )
             }
             Spacer(modifier = Modifier.height(2.dp))
-            ExpenseTextView(
-                text = date,
-                fontSize = 13.sp,
-                color = LightGrey,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExpenseTextView(
+                    text = date,
+                    fontSize = 13.sp,
+                    color = LightGrey,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (showSettleUp && onSettleUp != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF10B981))
+                            .clickable { onSettleUp() }
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "Settle Up",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
         Spacer(modifier = Modifier.width(8.dp))
         ExpenseTextView(

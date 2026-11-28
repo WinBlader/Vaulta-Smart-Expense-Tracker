@@ -1,10 +1,13 @@
 package com.waleed.vaulta.android
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.BottomAppBar
@@ -153,46 +156,53 @@ fun NavigationBottomBar(
     navController: NavController,
     items: List<NavItem>
 ) {
-    // Bottom Navigation Bar - Slim & Compact (62.dp)
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
+    val navBarColor = androidx.compose.material3.MaterialTheme.colorScheme.surface
 
-    BottomAppBar(
+    // Outer wrapper handles system navigation bar insets (3-button nav or gesture pill) with background color
+    androidx.compose.foundation.layout.Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(62.dp),
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
-        contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 3.dp
+            .background(navBarColor)
+            .navigationBarsPadding()
     ) {
-        items.forEach { item ->
-            NavigationBarItem(
-                selected = currentRoute == item.route,
-                onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+        // Inner fixed-height container preserves exact icon and pill proportions on all navigation modes
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { item ->
+                NavigationBarItem(
+                    selected = currentRoute == item.route,
+                    onClick = {
+                        navController.navigate(item.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                icon = {
-                    Icon(
-                        painter = painterResource(id = item.icon),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
+                    },
+                    icon = {
+                        Icon(
+                            painter = painterResource(id = item.icon),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    },
+                    alwaysShowLabel = false,
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                        unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                        unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.outline
                     )
-                },
-                alwaysShowLabel = false,
-                colors = NavigationBarItemDefaults.colors(
-                    selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
-                    unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
-                    unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.outline
                 )
-            )
+            }
         }
     }
 }

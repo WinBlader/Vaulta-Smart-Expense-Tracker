@@ -27,8 +27,8 @@ android {
         applicationId = "com.waleed.vaulta.android"
         minSdk = 24
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.5.4"
+        versionCode = 24
+        versionName = "1.5.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

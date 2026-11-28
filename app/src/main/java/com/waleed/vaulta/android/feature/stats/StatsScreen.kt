@@ -54,6 +54,20 @@ import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.ValueFormatter
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.waleed.vaulta.android.data.model.ExpenseEntity
+import com.waleed.vaulta.android.feature.home.AddCreditOweDialog
+import com.waleed.vaulta.android.feature.transactionlist.TransactionReceiptDialog
+
 @Composable
 fun StatsScreen(
     navController: NavController,
@@ -63,6 +77,92 @@ fun StatsScreen(
     val rawSummaries by viewModel.entries.collectAsState()
     val topExpense by viewModel.topEntries.collectAsState()
     val chartData = viewModel.getChartData(rawSummaries)
+
+    val scope = rememberCoroutineScope()
+    var pendingDeleteExpense by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var selectedItemForReceipt by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var editingCreditOweEntity by remember { mutableStateOf<com.waleed.vaulta.android.data.model.CreditOweEntity?>(null) }
+
+    selectedItemForReceipt?.let { item ->
+        TransactionReceiptDialog(
+            item = item,
+            onEdit = { viewModel.updateExpense(it) },
+            onDelete = {
+                pendingDeleteExpense = it
+                selectedItemForReceipt = null
+            },
+            onDismiss = { selectedItemForReceipt = null }
+        )
+    }
+
+    if (pendingDeleteExpense != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteExpense = null },
+            title = {
+                Text(
+                    text = "Delete Record?",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Red
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to delete this record?",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingDeleteExpense?.let { viewModel.deleteItem(it) }
+                        pendingDeleteExpense = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeleteExpense = null }
+                ) {
+                    Text(text = "Cancel", color = LightGrey)
+                }
+            }
+        )
+    }
+
+    editingCreditOweEntity?.let { co ->
+        AddCreditOweDialog(
+            initialEntity = co,
+            onDismiss = { editingCreditOweEntity = null },
+            onLookupContact = { query -> viewModel.lookupVaultaContact(query) },
+            onSearchUsers = { query -> viewModel.searchVaultaUsers(query) },
+            onSettle = {
+                viewModel.settleCreditOwe(co.id)
+                editingCreditOweEntity = null
+            },
+            onSave = { personName, amount, type, note, contact, counterpartyId ->
+                val updated = co.copy(
+                    personName = personName,
+                    amount = amount,
+                    type = type,
+                    note = note,
+                    counterpartyContact = contact,
+                    counterpartyId = counterpartyId
+                )
+                viewModel.updateCreditOwe(updated)
+                editingCreditOweEntity = null
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -259,6 +359,19 @@ fun StatsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 list = topExpense,
                 title = listTitle,
+                onItemClicked = { item ->
+                    if (item.uuid.startsWith("co_")) {
+                        val realId = item.uuid.removePrefix("co_")
+                        scope.launch {
+                            editingCreditOweEntity = viewModel.getCreditOweById(realId)
+                        }
+                    } else if (item.uuid.startsWith("sp_")) {
+                        navController.navigate("/all_transactions")
+                    } else {
+                        selectedItemForReceipt = item
+                    }
+                },
+                onDeleteClicked = { pendingDeleteExpense = it },
                 onSeeAllClicked = {
                     navController.navigate("/all_transactions")
                 }

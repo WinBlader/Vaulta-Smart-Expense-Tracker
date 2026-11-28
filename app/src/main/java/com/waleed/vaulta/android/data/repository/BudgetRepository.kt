@@ -12,7 +12,7 @@ interface BudgetRepository {
     fun setMonthlyBudget(amount: Double, currentExpenses: List<ExpenseEntity> = emptyList())
     fun calculateCurrentMonthSpends(expenses: List<ExpenseEntity>): Double
     fun checkBudgetAndNotify(expenses: List<ExpenseEntity>)
-    fun checkBalanceAndNotify(expenses: List<ExpenseEntity>, forceNotifyIfNegative: Boolean = false)
+    fun checkBalanceAndNotify(expenses: List<ExpenseEntity>, computedTotalBalance: Double? = null, forceNotifyIfNegative: Boolean = false)
 }
 
 @Singleton
@@ -36,7 +36,7 @@ class BudgetRepositoryImpl @Inject constructor(
         budgetManager.checkBudgetAndNotify(expenses)
     }
 
-    override fun checkBalanceAndNotify(expenses: List<ExpenseEntity>, forceNotifyIfNegative: Boolean) {
-        budgetManager.checkBalanceAndNotify(expenses, forceNotifyIfNegative)
+    override fun checkBalanceAndNotify(expenses: List<ExpenseEntity>, computedTotalBalance: Double?, forceNotifyIfNegative: Boolean) {
+        budgetManager.checkBalanceAndNotify(expenses, computedTotalBalance, forceNotifyIfNegative)
     }
 }

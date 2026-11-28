@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
+import kotlinx.coroutines.launch
+
 data class ChartData(
     val entries: List<Entry> = emptyList(),
     val secondaryEntries: List<Entry> = emptyList(), // For Credit/Owe dual chart (You Owe vs Owed to You)
@@ -114,6 +116,50 @@ class StatsViewModel @Inject constructor(
             labels = labels,
             totalAmount = if (total.isNaN()) 0.0 else total.coerceAtLeast(0.0)
         )
+    }
+
+    fun deleteItem(item: ExpenseEntity) {
+        viewModelScope.launch {
+            if (item.uuid.startsWith("co_")) {
+                val realId = item.uuid.removePrefix("co_")
+                expenseRepository.deleteCreditOwe(realId)
+            } else if (item.uuid.startsWith("sp_")) {
+                val realId = item.uuid.removePrefix("sp_")
+                expenseRepository.deleteSharedSplit(realId)
+            } else {
+                expenseRepository.deleteExpense(item)
+            }
+        }
+    }
+
+    suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity? {
+        return expenseRepository.getCreditOweById(id)
+    }
+
+    suspend fun lookupVaultaContact(query: String): com.waleed.vaulta.android.data.model.ContactLookupResult {
+        return expenseRepository.lookupVaultaContact(query)
+    }
+
+    suspend fun searchVaultaUsers(query: String): List<com.waleed.vaulta.android.data.model.VaultaUserSearchResult> {
+        return expenseRepository.searchVaultaUsers(query)
+    }
+
+    fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity) {
+        viewModelScope.launch {
+            expenseRepository.updateCreditOwe(entry)
+        }
+    }
+
+    fun settleCreditOwe(id: String) {
+        viewModelScope.launch {
+            expenseRepository.settleCreditOwe(id)
+        }
+    }
+
+    fun updateExpense(expense: ExpenseEntity) {
+        viewModelScope.launch {
+            expenseRepository.updateExpense(expense)
+        }
     }
 
     override fun onEvent(event: UiEvent) {

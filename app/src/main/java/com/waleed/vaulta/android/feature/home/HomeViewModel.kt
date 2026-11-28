@@ -35,7 +35,7 @@ class HomeViewModel @Inject constructor(
     private val supabaseAuthService: SupabaseAuthService
 ) : BaseViewModel() {
 
-    val expenses: Flow<List<ExpenseEntity>> = expenseRepository.getAllExpenses()
+    val expenses: Flow<List<ExpenseEntity>> = expenseRepository.getUnifiedTransactions()
     val sharedSplits: Flow<List<com.waleed.vaulta.android.data.model.SharedSplitEntity>> = expenseRepository.getAllSharedSplits()
     val user = authRepository.currentUser
     val monthlyBudget: StateFlow<Double> = budgetRepository.monthlyBudget
@@ -148,6 +148,25 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun settleSplitCustom(splitsToSettle: List<com.waleed.vaulta.android.data.model.SharedSplitEntity>, customAmounts: Map<String, Double>) {
+        viewModelScope.launch {
+            for (split in splitsToSettle) {
+                val customAmt = customAmounts[split.id]
+                if (customAmt != null && customAmt < split.splitAmount && customAmt > 0) {
+                    val remaining = split.splitAmount - customAmt
+                    // Update split with remaining balance, or mark as settled
+                    expenseRepository.updateSharedSplit(split.copy(splitAmount = remaining))
+                } else {
+                    expenseRepository.settleSharedSplit(split.id)
+                }
+            }
+            com.waleed.vaulta.android.widget.VaultaSnackbarController.show(
+                message = "Split settlement applied",
+                durationMs = 3000L
+            )
+        }
+    }
+
     fun deleteSharedSplit(id: String) {
         viewModelScope.launch {
             val success = expenseRepository.deleteSharedSplit(id)
@@ -173,7 +192,8 @@ class HomeViewModel @Inject constructor(
     }
 
     fun checkBalanceAndNotify(list: List<ExpenseEntity>) {
-        budgetRepository.checkBalanceAndNotify(list)
+        val total = getTotalBalanceAmount(list)
+        budgetRepository.checkBalanceAndNotify(list, computedTotalBalance = total)
     }
 
     fun insertExpense(expense: ExpenseEntity) {
@@ -197,6 +217,30 @@ class HomeViewModel @Inject constructor(
                     durationMs = 3000L
                 )
             }
+        }
+    }
+
+    fun deleteItem(item: ExpenseEntity) {
+        viewModelScope.launch {
+            if (item.uuid.startsWith("co_")) {
+                val realId = item.uuid.removePrefix("co_")
+                deleteCreditOwe(realId)
+            } else if (item.uuid.startsWith("sp_")) {
+                val realId = item.uuid.removePrefix("sp_")
+                deleteSharedSplit(realId)
+            } else {
+                deleteExpense(item)
+            }
+        }
+    }
+
+    suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity? {
+        return expenseRepository.getCreditOweById(id)
+    }
+
+    fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity) {
+        viewModelScope.launch {
+            expenseRepository.updateCreditOwe(entry)
         }
     }
 

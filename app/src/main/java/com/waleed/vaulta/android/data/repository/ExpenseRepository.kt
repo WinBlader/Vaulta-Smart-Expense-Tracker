@@ -64,6 +64,8 @@ interface ExpenseRepository {
 
     // Dedicated Credit / Owe Ledger
     fun getAllCreditOwe(): Flow<List<com.waleed.vaulta.android.data.model.CreditOweEntity>>
+    suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity?
+    fun getUnifiedTransactions(): Flow<List<ExpenseEntity>>
     suspend fun insertCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean
     suspend fun updateCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean
     suspend fun settleCreditOwe(id: String): Boolean
@@ -186,6 +188,65 @@ class ExpenseRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getUnifiedTransactions(): Flow<List<ExpenseEntity>> {
+        return sessionManager.currentUser.flatMapLatest { user ->
+            val userKey = sessionManager.getCurrentUserKey()
+            val fallbackEmail = user?.email ?: ""
+            val userPhone = user?.phoneNumber ?: ""
+
+            kotlinx.coroutines.flow.combine(
+                dao.getAllExpenseForUser(userKey, fallbackEmail),
+                creditOweDao.getCreditOweForUser(userKey, fallbackEmail),
+                sharedSplitDao.getSharedSplitsForUser(userKey, fallbackEmail)
+            ) { expenses, creditOwes, sharedSplits ->
+                val combined = mutableListOf<ExpenseEntity>()
+                combined.addAll(expenses)
+
+                for (co in creditOwes) {
+                    val isCreator = co.userId == userKey
+                    val isOwedToMe = if (isCreator) co.type.equals("CREDIT", ignoreCase = true) else !co.type.equals("CREDIT", ignoreCase = true)
+                    val isPending = co.status.equals("PENDING", ignoreCase = true)
+                    val noteSuffix = if (isPending) "" else " [SETTLED]"
+                    combined.add(
+                        ExpenseEntity(
+                            id = ("co_${co.id}".hashCode() and 0x7FFFFFFF),
+                            title = co.personName,
+                            amount = if (co.amount.isNaN()) 0.0 else co.amount.coerceAtLeast(0.0),
+                            date = Utils.formatDateToHumanReadableForm(co.createdAt),
+                            type = if (isOwedToMe) "Owed to You" else "You Owe",
+                            userId = userKey,
+                            note = (co.note ?: if (isOwedToMe) "Owed to you" else "You owe") + noteSuffix,
+                            uuid = "co_${co.id}"
+                        )
+                    )
+                }
+
+                for (ss in sharedSplits) {
+                    val isCreator = ss.creatorId == userKey ||
+                        (ss.creatorContact != null && (ss.creatorContact == fallbackEmail || ss.creatorContact == userPhone))
+                    val isOwedToMe = if (isCreator) ss.direction == "OWED_TO_CREATOR" else ss.direction != "OWED_TO_CREATOR"
+                    val personName = if (isCreator) ss.counterpartyName else ss.creatorName
+                    val isPending = ss.status.equals("PENDING", ignoreCase = true)
+                    val noteSuffix = if (isPending) "" else " [SETTLED]"
+                    combined.add(
+                        ExpenseEntity(
+                            id = ("sp_${ss.id}".hashCode() and 0x7FFFFFFF),
+                            title = personName,
+                            amount = if (ss.splitAmount.isNaN()) 0.0 else ss.splitAmount.coerceAtLeast(0.0),
+                            date = Utils.formatDateToHumanReadableForm(ss.timestamp),
+                            type = "Split",
+                            userId = userKey,
+                            note = ss.title + (if (isOwedToMe) " (owes you)" else " (you owe)") + noteSuffix,
+                            uuid = "sp_${ss.id}"
+                        )
+                    )
+                }
+
+                combined.sortedByDescending { Utils.getMillisFromDate(it.date) }
+            }
+        }
+    }
+
     override fun getAllExpenseByDate(type: String): Flow<List<ExpenseSummary>> {
         return sessionManager.currentUser.flatMapLatest { user ->
             val userKey = sessionManager.getCurrentUserKey()
@@ -273,7 +334,6 @@ class ExpenseRepositoryImpl @Inject constructor(
             dao.insertExpense(toSave)
             val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
-            budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             recomputeAndPersistBalance(resolvedUserId)
 
             // Asynchronously sync to Supabase if authenticated (skip guest)
@@ -301,7 +361,6 @@ class ExpenseRepositoryImpl @Inject constructor(
             dao.updateExpense(toSave)
             val updated = dao.getAllExpenseForUser(if (resolvedUserId.isNotBlank()) resolvedUserId else userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
-            budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             recomputeAndPersistBalance(resolvedUserId)
 
             pushTransactionToCloud(toSave)
@@ -342,7 +401,6 @@ class ExpenseRepositoryImpl @Inject constructor(
 
             val updated = dao.getAllExpenseForUser(userKey).first()
             budgetManager.checkBudgetAndNotify(updated)
-            budgetManager.checkBalanceAndNotify(updated, forceNotifyIfNegative = true)
             recomputeAndPersistBalance(userKey)
             true
         } catch (e: Exception) {
@@ -578,7 +636,6 @@ class ExpenseRepositoryImpl @Inject constructor(
 
                 val finalLocalList = dao.getExpensesListForUser(effectiveUserId, fallbackEmail)
                 budgetManager.checkBudgetAndNotify(finalLocalList)
-                budgetManager.checkBalanceAndNotify(finalLocalList)
                 recomputeAndPersistBalance(effectiveUserId)
 
                 // 4d. Reinstall Hydration & Sync: Shared Splits & Universal Ledger
@@ -693,7 +750,7 @@ class ExpenseRepositoryImpl @Inject constructor(
             }
 
             budgetManager.checkBudgetAndNotify(emptyList())
-            budgetManager.checkBalanceAndNotify(emptyList())
+            budgetManager.checkBalanceAndNotify(emptyList(), computedTotalBalance = 0.0)
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Notice during clearCurrentUserData: ${e.message}", e)
         }
@@ -759,6 +816,9 @@ class ExpenseRepositoryImpl @Inject constructor(
             )
             userBalanceDao.upsert(balanceEntity)
 
+            // Trigger negative balance check with true totalBalance
+            budgetManager.checkBalanceAndNotify(expenses, computedTotalBalance = liveCurrentBalance)
+
             // If userKey is authenticated, push updated balances to Supabase public.profiles
             if (SupabaseClientProvider.isConfigured() && userKey != "guest" && userKey.isNotBlank()) {
                 val authUid = ensureAuthenticatedSession()
@@ -800,6 +860,7 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             sharedSplitDao.insertSharedSplit(split)
             pushSharedSplitToCloud(split)
+            recomputeAndPersistBalance(split.creatorId)
             true
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Error inserting shared split: ${e.message}", e)
@@ -813,6 +874,8 @@ class ExpenseRepositoryImpl @Inject constructor(
             for (split in splits) {
                 pushSharedSplitToCloud(split)
             }
+            val creatorKey = splits.firstOrNull()?.creatorId
+            recomputeAndPersistBalance(creatorKey)
             true
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Error inserting shared splits: ${e.message}", e)
@@ -824,6 +887,7 @@ class ExpenseRepositoryImpl @Inject constructor(
         try {
             sharedSplitDao.updateSharedSplit(split)
             pushSharedSplitToCloud(split)
+            recomputeAndPersistBalance(split.creatorId)
             true
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Error updating shared split: ${e.message}", e)
@@ -837,6 +901,9 @@ class ExpenseRepositoryImpl @Inject constructor(
             val split = sharedSplitDao.getSharedSplitById(id)
             if (split != null) {
                 pushSharedSplitToCloud(split)
+                recomputeAndPersistBalance(split.creatorId)
+            } else {
+                recomputeAndPersistBalance()
             }
             true
         } catch (e: Exception) {
@@ -847,6 +914,7 @@ class ExpenseRepositoryImpl @Inject constructor(
 
     override suspend fun deleteSharedSplit(id: String): Boolean = withContext(Dispatchers.IO) {
         try {
+            val existingSplit = sharedSplitDao.getSharedSplitById(id)
             sharedSplitDao.deleteSharedSplitById(id)
             if (SupabaseClientProvider.isConfigured()) {
                 val authUid = ensureAuthenticatedSession()
@@ -862,6 +930,7 @@ class ExpenseRepositoryImpl @Inject constructor(
                     }
                 }
             }
+            recomputeAndPersistBalance(existingSplit?.creatorId)
             true
         } catch (e: Exception) {
             Log.e("VaultaCloudSync", "Error deleting shared split: ${e.message}", e)
@@ -1011,6 +1080,10 @@ class ExpenseRepositoryImpl @Inject constructor(
             val contact = user?.email?.ifBlank { user.phoneNumber } ?: ""
             creditOweDao.getCreditOweForUser(userKey, contact)
         }
+    }
+
+    override suspend fun getCreditOweById(id: String): com.waleed.vaulta.android.data.model.CreditOweEntity? = withContext(Dispatchers.IO) {
+        creditOweDao.getCreditOweById(id)
     }
 
     override suspend fun insertCreditOwe(entry: com.waleed.vaulta.android.data.model.CreditOweEntity): Boolean = withContext(Dispatchers.IO) {

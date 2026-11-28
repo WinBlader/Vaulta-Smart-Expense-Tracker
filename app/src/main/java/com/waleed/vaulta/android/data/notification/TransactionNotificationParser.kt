@@ -351,7 +351,7 @@ object TransactionNotificationParser {
             if (fallbackBank != null) {
                 if (type == "Expense") "Paid via $fallbackBank" else "Received via $fallbackBank"
             } else {
-                if (type == "Expense") "Paid via Bank/UPI" else "Received via Bank/UPI"
+                if (type == "Expense") "Paid via UPI" else "Received via UPI"
             }
         }
 
@@ -437,20 +437,22 @@ object TransactionNotificationParser {
             Regex("""(?i)\b(?:from|by)\s+(?:vpa\s*:?\s*)([A-Za-z0-9\.\-_@]+)"""),
             // "VPA <upi_id>"
             Regex("""(?i)\bvpa\s*:?\s*([A-Za-z0-9\.\-_@]+)"""),
+            // Specific recipient matching after transfer tokens, ignoring noise tokens e.g. "trf to Rahul Sharma Refno..."
+            Regex("""(?i)\b(?:paid to|sent to|trf to|transferred to|toward[s]?)\s+([A-Za-z][A-Za-z0-9\s&'’\.\-_]{1,40}?)(?:\s+(?:via\s+upi|using\s+upi|with\s+upi|ref|refno|rrn|avl|bal|on\s+\d|\.|\band\b|$))"""),
             // "<Sender> (has) paid / sent you" e.g. "AJAZ Ahmad WANI paid you 101.00" or "Ajaz sent you ₹101"
             Regex("""(?i)\b([A-Za-z0-9\s&'’\.\-_]+?)\s+(?:has\s+)?(?:paid|sent)\s+you\b"""),
             // "sent ... to <Recipient>" e.g. "sent Rs.500 to Rahul Sharma"
-            Regex("""(?i)\bsent\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?to\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\bsent\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?to\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+refno|\s+rrn|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "paid ... to/at <Merchant>" e.g. "paid ₹250 to Swiggy"
-            Regex("""(?i)\bpaid\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\bpaid\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+refno|\s+rrn|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "received ... from <Sender>" e.g. "received Rs.1,000 from Amit Kumar"
-            Regex("""(?i)\breceived\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?from\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\breceived\s+(?:(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*[\d,.]+|[\d,.]+\s*(?:[₹$€£]|Rs\.?|INR|USD|EUR|GBP|AED|SAR|SGD|AUD|CAD|JPY)\s*)?(?:of\s+[^.]*?)?from\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+on\s+\d|\s+ref|\s+refno|\s+rrn|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "credited ... from (VPA) <Sender>" e.g. "credited ... from VPA abc@ybl"
             Regex("""(?i)\bcredited\s+.*?(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)(?:vpa\s*:?\s*)?([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "debited ... to (VPA) <Recipient>" e.g. "debited ... to VPA xyz@okicici"
-            Regex("""(?i)\bdebited\s+.*?(?:to|towards)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)(?:vpa\s*:?\s*)?([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\bdebited\s+.*?(?:to|towards)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)(?:vpa\s*:?\s*)?([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+refno|\s+rrn|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "to/at <Merchant>"
-            Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
+            Regex("""(?i)\b(?:to|at)\s+([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+successful|\s+using|\s+via|\s+from|\s+on\s+\d|\s+ref|\s+refno|\s+rrn|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "(by transfer) from <Sender>"
             Regex("""(?i)\b(?:(?:by\s+)?transfer\s+from|from|by)\s+(?!(?:your\s+)?(?:a/c|acct|account|card|bank)\b)([A-Za-z0-9\s&'’\.\-_@]+?)(?:\s+to|\s+on\s+\d|\s+ref|\s+avl|\s+bal|\.|\band\b|$)"""),
             // "Info: <Merchant>" e.g. Info: UPI/Uber or Info: Amazon Retail
@@ -512,6 +514,11 @@ object TransactionNotificationParser {
             return ""
         }
 
+        // Discard pure numeric strings or reference IDs like "92156..." or "Ref 12345"
+        if (trimmed.matches(Regex("""^(?i)(?:ref(?:no)?\.?\s*)?\d{4,}$"""))) {
+            return ""
+        }
+
         // 2. Strip banking boilerplate phrases & trailing "paid you 101.00", "sent you", etc.
         var stripped = trimmed
             .replace(Regex("""(?i)^(?:(?:by\s+)?transfer\s+from|from|by)\s+"""), "")
@@ -521,9 +528,15 @@ object TransactionNotificationParser {
             .replace(Regex("""(?i)\b(?:in|into|from|to)\s+your\s+[A-Za-z0-9\s]+?(?:account|a/c|bank)\b.*$"""), "")
             .replace(Regex("""(?i)\s*\[?(?:INR|USD|EUR|GBP|AED|SAR|Rs\.?|₹|\$)\]?\s*"""), " ")
             .replace(Regex("""(?i)^(the|m/s|vpa)\s+"""), "")
-            .replace(Regex("""(?i)\s+(successful|completed|via\s+upi|using\s+upi|with\s+upi).*$"""), "")
+            .replace(Regex("""(?i)\s+(?:successful|completed|via\s+upi|using\s+upi|with\s+upi|upi\s+ref|ref\s*no|refno|rrn).*$"""), "")
             .replace(Regex("""[.,\-_/]+$"""), "")
             .trim()
+
+        // Explicitly check for generic noise tokens that shouldn't serve as a person/merchant name alone
+        val noiseTokens = setOf("UPI", "UPI TRANSFER", "BANK", "ACCOUNT", "A/C", "VPA", "REF", "IMPS", "NEFT", "RTGS", "PAYMENT", "TRANSFER")
+        if (noiseTokens.contains(stripped.uppercase(Locale.US))) {
+            return ""
+        }
 
         // If stripped is empty or just generic word
         if (stripped.isBlank() || stripped.equals("Deposited", ignoreCase = true) || stripped.equals("Credited", ignoreCase = true) || stripped.equals("Debited", ignoreCase = true)) {
